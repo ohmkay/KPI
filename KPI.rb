@@ -1,6 +1,7 @@
 require 'csv'
 require 'date'
 require 'time'
+require 'WriteExcel'
 require_relative ('Users')
 
 #####################################################################################
@@ -69,19 +70,17 @@ def read_data(users_csv, cases_csv, tasks_csv)
 end
 
 ###############################
-# Creating statistics
+# Generate Statistics
 ###############################
-def create_statistics
+def write_to_excel(users, start_date, end_date)
+	workbook = WriteExcel.new('../text.xlsx')
 
+	team_summary_worksheet = workbook.add_worksheet
+
+	write_data(worksheet,1,10, 19019)
+	
+	workbook.close
 end
-
-###############################
-# Writing data to excel
-###############################
-def write_data(workbook, worksheet, row, column)
-
-end
-
 
 ###############################
 # Main Function
@@ -93,28 +92,39 @@ def run_forrest_run
 	end_date = Date.new(2016,01,31)
 
 	#read in data
-	users_csv = 'D:\KPI\Ruby\WIP\userList.csv'
-	cases_csv = 'D:\KPI\Ruby\WIP\CogentCase.csv'
-	tasks_csv = 'D:\KPI\Ruby\WIP\CaseTask_Hours2.csv'
+	users_csv = 'C:\Users\Caleb\Documents\Ruby\CSVs\userList.csv'
+	cases_csv = 'C:\Users\Caleb\Documents\Ruby\CSVs\CogentCase.csv'
+	tasks_csv = 'C:\Users\Caleb\Documents\Ruby\CSVs\CaseTask_Hours2.csv'
 
 	#read in data from CSV into array users of User class
 	users = read_data(users_csv, cases_csv, tasks_csv)
 
-	#create_statistics()
+	users.each {|user| puts user.team}
 
+	users.sort! { |x, y| x.team <=> y.team}
+	puts '-' * 25
+
+	users.each do |user| 
+		puts user.team 
+		puts user.name
+	end
+
+
+	users[5].generate_statistics(start_date, end_date)
+	puts users[5].created_cases
 
 	###############################
 	# Testing and debugging section
 	###############################
-	users.each do |user|
-		total_tickets = 0
-		puts user.name
-		user.cases.each do |ticket|
-			total_tickets += 1
-		end
-		puts "Total tickets: #{total_tickets}"
-		puts '-' * 25
-	end
+	#users.each do |user|
+	#	total_tickets = 0
+	#	puts user.name
+	#	user.cases.each do |ticket|
+	#		total_tickets += 1
+	#	end
+	#	puts "Total tickets: #{total_tickets}"
+	#	puts '-' * 25
+	#end
 
 
 
