@@ -72,7 +72,7 @@ end
 ###############################
 # Generate Statistics
 ###############################
-def generate_statistics(users, start_date, end_date)
+def write_to_excel(users, start_date, end_date)
 	workbook = WriteExcel.new('../text.xlsx')
 
 	team_summary_worksheet = workbook.add_worksheet
@@ -99,11 +99,19 @@ def run_forrest_run
 	#read in data from CSV into array users of User class
 	users = read_data(users_csv, cases_csv, tasks_csv)
 
-	users.sort!
+	users.each {|user| puts user.team}
 
-	#puts users[5].count_hours(start_date, end_date)
+	users.sort! { |x, y| x.team <=> y.team}
+	puts '-' * 25
 
-	generate_statistics(users, start_date, end_date)
+	users.each do |user| 
+		puts user.team 
+		puts user.name
+	end
+
+
+	users[5].generate_statistics(start_date, end_date)
+	puts users[5].created_cases
 
 	###############################
 	# Testing and debugging section
