@@ -64,23 +64,52 @@ def read_data(users_csv, cases_csv, tasks_csv)
 			user.add_tasks(temp_task) if user.a_number == a_number
 		end
 	end
-
 	return users
-
 end
 
 ###############################
 # Generate Statistics
 ###############################
-def write_to_excel(users, start_date, end_date)
-	workbook = WriteExcel.new('../text.xlsx')
+def write_to_excel(users)
+	workbook = WriteExcel.new('../test.xlsx')
 
-	team_summary_worksheet = workbook.add_worksheet
+	## Hours Worksheet processing ##
+	hours_worksheet = workbook.add_worksheet
+	write_headers_to_excel(workbook, hours_worksheet, users, "Hours Sum")
 
-	write_data(worksheet,1,10, 19019)
-	
 	workbook.close
 end
+
+def write_headers_to_excel(workbook, worksheet, users, title)
+	worksheet.write(0,0, "Team")
+	worksheet.write(0,1, "Owner")
+	worksheet.write(0,2, title)
+	vertical_format = workbook.add_format(:valign  => 'vcenter', :align   => 'center', :rotation => '90')
+
+	row = 2
+	team = users[0].team
+	team_start = row
+
+	#writes user names and user teams with merged cells
+	users.each do |user|
+		
+		if team != user.team
+			range_string = "A#{team_start}:A#{row-1}', '#{team}"
+			worksheet.merge_range(range_string, team, vertical_format) 
+			team_start = row
+		end
+
+		worksheet.write(row-1, 1, user.name)
+		worksheet.write(row-1, 2, user.hours_total)
+
+		team = user.team
+		row += 1
+	end
+
+	range_string = "A#{team_start}:A#{row-1}', '#{team}"
+	worksheet.merge_range(range_string, team, vertical_format) 
+end		
+
 
 ###############################
 # Main Function
@@ -98,36 +127,11 @@ def run_forrest_run
 
 	#read in data from CSV into array users of User class
 	users = read_data(users_csv, cases_csv, tasks_csv)
-
-	users.each {|user| puts user.team}
-
 	users.sort! { |x, y| x.team <=> y.team}
-	puts '-' * 25
 
-	users.each do |user| 
-		puts user.team 
-		puts user.name
-	end
+	users.each {|x| x.generate_statistics(start_date, end_date)}
 
-
-	users[5].generate_statistics(start_date, end_date)
-	puts users[5].created_cases
-
-	###############################
-	# Testing and debugging section
-	###############################
-	#users.each do |user|
-	#	total_tickets = 0
-	#	puts user.name
-	#	user.cases.each do |ticket|
-	#		total_tickets += 1
-	#	end
-	#	puts "Total tickets: #{total_tickets}"
-	#	puts '-' * 25
-	#end
-
-
-
+	write_to_excel(users)
 end
 
 run_forrest_run()

@@ -28,8 +28,13 @@ class User
 
 
 		tasks.each do |task_row|
-			@hours_total += task_row.hours if (task_row.hours != nil) && (task_row.complete_date <= end_date) && (task_row.complete_date >= start_date)
+			@hours_total += task_row.hours if (!task_row.hours.nil? && !task_row.complete_date.nil?) && 
+			(task_row.complete_date <= end_date) && (task_row.complete_date >= start_date)
 		end
+	end
+
+	def format_worksheet(workboot, worksheet, title)
+
 	end
 
 end
