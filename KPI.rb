@@ -43,10 +43,8 @@ def read_data(users_csv, cases_csv, tasks_csv)
 		
 		a_number = line[1]
 
-		temp_case = Case.new(create_date, close_date, a_number)
-		
 		users.select do |user|
-			user.add_cases(temp_case) if user.a_number == a_number
+			user.add_cases(Struct::Case.new(create_date, close_date, a_number)) if user.a_number == a_number
 		end
 	end
 
@@ -57,11 +55,9 @@ def read_data(users_csv, cases_csv, tasks_csv)
 
 	 	a_number = line[3]
 		hours = line[11].to_f
-
-		temp_task = Task.new(complete_date, a_number, hours)
 		
 		users.select do |user|
-			user.add_tasks(temp_task) if user.a_number == a_number
+			user.add_tasks(Struct::Task.new(complete_date, a_number, hours)) if user.a_number == a_number
 		end
 	end
 	return users

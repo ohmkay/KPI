@@ -21,15 +21,15 @@ class User
 
 	def generate_statistics(start_date, end_date)
 		cases.each do |ticket|
-			@created_cases += 1 if (!ticket.create_date.nil? && ticket.create_date >= start_date)
-			@closed_cases += 1 if !ticket.close_date.nil? && (ticket.close_date <= end_date && ticket.close_date >= start_date)	
-			@open_cases += 1 if (ticket.close_date.nil? || ticket.close_date <= end_date )
+			@created_cases += 1 if (ticket[:create_date].nil? && ticket[:create_date] >= start_date)
+			@closed_cases += 1 if !ticket[:close_date].nil? && (ticket[:close_date] <= end_date && ticket[:close_date] >= start_date)	
+			@open_cases += 1 if (ticket[:close_date].nil? || ticket[:close_date] <= end_date )
 		end
 
 
-		tasks.each do |task_row|
-			@hours_total += task_row.hours if (!task_row.hours.nil? && !task_row.complete_date.nil?) && 
-			(task_row.complete_date <= end_date) && (task_row.complete_date >= start_date)
+		tasks.each do |task|
+			@hours_total += task[:hours] if (!task[:hours].nil? && !task[:complete_date].nil?) && 
+			(task[:complete_date] <= end_date) && (task[:complete_date] >= start_date)
 		end
 	end
 
@@ -39,22 +39,5 @@ class User
 
 end
 
-class Case
-	attr_accessor :create_date, :close_date, :a_number
-
-	def initialize(create_date, close_date, a_number)
-		@create_date = create_date
-		@close_date = close_date
-		@a_number = a_number
-	end
-end
-
-class Task
-	attr_accessor :complete_date, :a_number, :hours
-
-	def initialize(complete_date, a_number, hours)
-		@complete_date = complete_date
-		@a_number = a_number
-		@hours = hours
-	end
-end
+Struct.new("Case",:create_date, :close_date, :a_number)
+Struct.new("Task", :complete_date, :a_number, :hours)
