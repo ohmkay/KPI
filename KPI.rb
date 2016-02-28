@@ -77,39 +77,61 @@ def write_to_excel(users)
 end
 
 def write_headers_to_excel(workbook, worksheet, users, title)
-	worksheet.write(0,0, "Team")
-	worksheet.write(0,1, "Owner")
-	worksheet.write(0,2, title)
-	vertical_format = workbook.add_format(:valign  => 'vcenter', :align   => 'center', :rotation => '90')
+	column_format = workbook.add_format(:valign  => 'vcenter', :align   => 'center', :bg_color => 'black', :fg_color => 'green')
+	worksheet.write(0,0, "Team", column_format)
+	worksheet.write(0,1, "Owner", column_format)
+	worksheet.write(0,2, title, column_format)
+
+	title_format = workbook.add_format(
+		:valign  => 'vcenter', 
+		:align   => 'center',
+		:rotation => '90', 
+		:bold => true,
+		:bg_color => 'blue'	
+	)
+	cell_format = workbook.add_format(
+		:valign  => 'vcenter', 
+		:align   => 'center',
+		:bg_color => 'blue'	
+	)
 
 	row = 2
 	team = users[0].team
 	team_start = row
+	alternate_count = false
 
-	#writes user names and user teams with merged cells
+	#writes user names and user teams with merged cells with formatting
 	users.each do |user|
 		
 		if team != user.team
+			puts alternate_count
+			alternate_count = !alternate_count
 			range_string = "A#{team_start}:A#{row-1}', '#{team}"
-			worksheet.merge_range(range_string, team, vertical_format) 
+			worksheet.merge_range(range_string, team, title_format) 
 			team_start = row
+			if alternate_count == true
+				cell_format.set_bg_color('red')
+				title_format.set_bg_color('red') 
+			else 
+				cell_format.set_bg_color('blue')
+				title_format.set_bg_color('blue')
+			end
 		end
 
-		worksheet.write(row-1, 1, user.name)
-		worksheet.write(row-1, 2, user.hours_total)
+		worksheet.write(row-1, 1, user.name, cell_format)
+		worksheet.write(row-1, 2, user.hours_total, cell_format)
 
 		team = user.team
 		row += 1
 	end
 
 	range_string = "A#{team_start}:A#{row-1}', '#{team}"
-	worksheet.merge_range(range_string, team, vertical_format) 
-end		
+	worksheet.merge_range(range_string, team, title_format) 
+end
 
-
-###############################
+###############
 # Main Function
-###############################
+###############
 def run_forrest_run
 
 	#Change these dates
