@@ -67,24 +67,47 @@ end
 # Generate Statistics
 #####################
 def write_to_excel(users)
-	workbook = WriteExcel.new('../test.xlsx')
+	workbook = WriteExcel.new('../test.xls')
 
-	## Hours Worksheet processing ##
-	hours_worksheet = workbook.add_worksheet
-	write_headers_to_excel(workbook, hours_worksheet, users, "Hours Sum", "Hours Sum Per Team")
-
-	title_format = workbook.add_format(
+	#creating formats and alternate colors
+	title_format_1 = workbook.add_format(
 		:valign  => 'vcenter', 
 		:align   => 'center',
 		:rotation => '90', 
 		:bold => true,
 		:bg_color => 'blue'	
 	)
-	cell_format = workbook.add_format(
+	title_format_2 = workbook.add_format(
 		:valign  => 'vcenter', 
 		:align   => 'center',
-		:bg_color => 'blue'	
+		:rotation => '90', 
+		:bold => true,
+		:bg_color => 'red'	
 	)
+	cell_format_1 = workbook.add_format(
+		:valign  => 'vcenter', 
+		:align   => 'center',
+		:bg_color => 'blue'
+	)
+	cell_format_2 = workbook.add_format(
+		:valign  => 'vcenter', 
+		:align   => 'center',
+		:bg_color => 'red'
+	)
+	merged_cell_format_1 = workbook.add_format(
+		:valign  => 'vcenter', 
+		:align   => 'center',
+		:bg_color => 'blue'
+	)
+	merged_cell_format_2 = workbook.add_format(
+		:valign  => 'vcenter', 
+		:align   => 'center',
+		:bg_color => 'red'
+	)
+
+	## Hours Worksheet processing ##
+	hours_worksheet = workbook.add_worksheet
+	write_headers_to_excel(workbook, hours_worksheet, users, "Hours Sum", "Hours Sum Per Team")
 
 	row, sum = 2, 0
 	team = users[0].team
@@ -93,41 +116,48 @@ def write_to_excel(users)
 
 	#writes user names and user teams with merged cells with formatting
 	users.each do |user|
-		puts sum
 		
 		if team != user.team
-			alternate_count = !alternate_count
 			team_names = "A#{team_start}:A#{row-1}, #{team}"
-			worksheet.merge_range(team_names, team, title_format)
-			
-
 			totals = "D#{team_start}:D#{row-1}, #{sum}"
-			worksheet.merge_range(totals, sum, cell_format)
 
 			if alternate_count == true
-				cell_format.set_bg_color('red')
-				title_format.set_bg_color('red') 
-			else 
-				cell_format.set_bg_color('blue')
-				title_format.set_bg_color('blue')
+				hours_worksheet.merge_range(team_names, team, title_format_1)
+				hours_worksheet.merge_range(totals, sum, cell_format_1)
+			else
+				hours_worksheet.merge_range(team_names, team, title_format_2)
+				hours_worksheet.merge_range(totals, sum, cell_format_2)
 			end
+
 			team_start = row
 			sum = 0
+			alternate_count = !alternate_count
 		end
 
-		worksheet.write(row-1, 1, user.name, cell_format)
-		worksheet.write(row-1, 2, user.hours_total, cell_format)
+		if alternate_count == true
+			hours_worksheet.write(row-1, 1, user.name, cell_format_1) 
+			hours_worksheet.write_number(row-1, 2, user.hours_total, merged_cell_format_1)
+		else
+			hours_worksheet.write(row-1, 1, user.name, cell_format_2)
+			hours_worksheet.write_number(row-1, 2, user.hours_total, merged_cell_format_2)
+		end
 
 		team = user.team
 		row += 1
 		sum += user.hours_total if !user.hours_total.nil?
 	end
 
+	#processing for last team
 	team_names = "A#{team_start}:A#{row-1}, #{team}"
-	worksheet.merge_range(team_names, team, title_format) 
-
 	totals = "D#{team_start}:D#{row-1}, #{sum}"
-	worksheet.merge_range(totals, sum, cell_format)
+			
+	if alternate_count == true
+		hours_worksheet.merge_range(team_names, team, title_format_1)
+		hours_worksheet.merge_range(totals, sum, cell_format_1)
+	else
+		hours_worksheet.merge_range(team_names, team, title_format_2)
+		hours_worksheet.merge_range(totals, sum, cell_format_2)
+	end
 
 	workbook.close
 end
@@ -136,7 +166,7 @@ end
 # Writes column headers to excel doc
 ####################################
 def write_headers_to_excel(workbook, worksheet, users, title, title2)
-	column_format = workbook.add_format(:valign  => 'vcenter', :align   => 'center', :bg_color => 'black', :fg_color => 'green')
+	column_format = workbook.add_format(:valign  => 'vcenter', :align   => 'center', :bg_color => 'green')
 	worksheet.write(0,0, "Team", column_format)
 	worksheet.write(0,1, "Owner", column_format)
 	worksheet.write(0,2, title, column_format)
@@ -153,14 +183,13 @@ def run_forrest_run
 	end_date = Date.new(2016,01,31)
 
 	#read in data
-	users_csv = 'C:\Users\Caleb\Documents\Ruby\CSVs\userList.csv'
-	cases_csv = 'C:\Users\Caleb\Documents\Ruby\CSVs\CogentCase.csv'
-	tasks_csv = 'C:\Users\Caleb\Documents\Ruby\CSVs\CaseTask_Hours2.csv'
+	users_csv = 'C:\Users\A5NB3ZZ\Dropbox\KPICSV\userList.csv'
+	cases_csv = 'C:\Users\A5NB3ZZ\Dropbox\KPICSV\CogentCase.csv'
+	tasks_csv = 'C:\Users\A5NB3ZZ\Dropbox\KPICSV\CaseTask_Hours2.csv'
 
 	#read in data from CSV into array users of User class
 	users = read_data(users_csv, cases_csv, tasks_csv)
-	users.sort! { |x, y| x.team <=> y.team}
-
+	users.sort! {|x, y| x.team <=> y.team}
 	users.each {|x| x.generate_statistics(start_date, end_date)}
 
 	write_to_excel(users)
