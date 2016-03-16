@@ -105,7 +105,9 @@ def write_to_excel(users)
 		:bg_color => 'red'
 	)
 
-	## Hours Worksheet processing ##
+	###############################
+	# Writes data for hours
+	###############################
 	hours_worksheet = workbook.add_worksheet
 	write_headers_to_excel(workbook, hours_worksheet, users, "Hours Sum", "Hours Sum Per Team")
 
@@ -159,6 +161,12 @@ def write_to_excel(users)
 		hours_worksheet.merge_range(totals, sum, cell_format_2)
 	end
 
+
+	###############################
+	# Writes data for open tickets
+	###############################
+
+
 	workbook.close
 end
 
@@ -183,9 +191,9 @@ def run_forrest_run
 	end_date = Date.new(2016,01,31)
 
 	#read in data
-	users_csv = 'C:\Users\A5NB3ZZ\Dropbox\KPICSV\userList.csv'
-	cases_csv = 'C:\Users\A5NB3ZZ\Dropbox\KPICSV\CogentCase.csv'
-	tasks_csv = 'C:\Users\A5NB3ZZ\Dropbox\KPICSV\CaseTask_Hours2.csv'
+	users_csv = 'C:\Users\caleb\Dropbox\KPICSV\userList.csv'
+	cases_csv = 'C:\Users\caleb\Dropbox\KPICSV\CogentCase.csv'
+	tasks_csv = 'C:\Users\caleb\Dropbox\KPICSV\CaseTask_Hours2.csv'
 
 	#read in data from CSV into array users of User class
 	users = read_data(users_csv, cases_csv, tasks_csv)
