@@ -33,10 +33,6 @@ class User
 		end
 	end
 
-	def format_worksheet(workboot, worksheet, title)
-
-	end
-
 end
 
 Struct.new("Case", :create_date, :close_date, :a_number)

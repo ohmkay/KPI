@@ -63,13 +63,21 @@ def read_data(users_csv, cases_csv, tasks_csv)
 	return users
 end
 
-#####################
-# Generate Statistics
-#####################
-def write_to_excel(users)
-	workbook = WriteExcel.new('../test.xls')
+####################################
+# Writes column headers to excel doc
+####################################
+def write_headers_to_excel(workbook, worksheet, users, title, title2)
+	column_format = workbook.add_format(:valign  => 'vcenter', :align   => 'center', :bg_color => 'green')
+	worksheet.write(0,0, "Team", column_format)
+	worksheet.write(0,1, "Owner", column_format)
+	worksheet.write(0,2, title, column_format)
+	worksheet.write(0,3, title2, column_format)
+end
 
-	#creating formats and alternate colors
+###########################
+# Generate worksheet styles
+###########################
+def generate_styles(workbook)
 	title_format_1 = workbook.add_format(
 		:valign  => 'vcenter', 
 		:align   => 'center',
@@ -105,12 +113,29 @@ def write_to_excel(users)
 		:bg_color => 'red'
 	)
 
-	###############################
-	# Writes data for hours
-	###############################
-	hours_worksheet = workbook.add_worksheet
-	write_headers_to_excel(workbook, hours_worksheet, users, "Hours Sum", "Hours Sum Per Team")
+	return title_format_1, title_format_2, cell_format_1, cell_format_2, 
+		   merged_cell_format_1, merged_cell_format_2
+end
 
+####################################################
+# changes which variable is selected from user class
+####################################################
+def select_user_variable(user, user_case)
+	case user_case
+	when 'hours'
+		user.hours_total
+	when 'open'
+		user.open_cases
+	when 'closed'
+		user.closed_cases
+	end
+end
+
+#####################
+# Generate Statistics
+#####################
+def write_worksheet(worksheet, users, user_case, tf1, tf2, cf1, cf2, mcf1, mcf2)
+	
 	row, sum = 2, 0
 	team = users[0].team
 	team_start = row
@@ -118,17 +143,17 @@ def write_to_excel(users)
 
 	#writes user names and user teams with merged cells with formatting
 	users.each do |user|
-		
+
 		if team != user.team
 			team_names = "A#{team_start}:A#{row-1}, #{team}"
 			totals = "D#{team_start}:D#{row-1}, #{sum}"
 
 			if alternate_count == true
-				hours_worksheet.merge_range(team_names, team, title_format_1)
-				hours_worksheet.merge_range(totals, sum, cell_format_1)
+				worksheet.merge_range(team_names, team, tf1)
+				worksheet.merge_range(totals, sum, cf1)
 			else
-				hours_worksheet.merge_range(team_names, team, title_format_2)
-				hours_worksheet.merge_range(totals, sum, cell_format_2)
+				worksheet.merge_range(team_names, team, tf2)
+				worksheet.merge_range(totals, sum, cf2)
 			end
 
 			team_start = row
@@ -137,16 +162,16 @@ def write_to_excel(users)
 		end
 
 		if alternate_count == true
-			hours_worksheet.write(row-1, 1, user.name, cell_format_1) 
-			hours_worksheet.write_number(row-1, 2, user.hours_total, merged_cell_format_1)
+			worksheet.write(row-1, 1, user.name, cf1) 
+			worksheet.write(row-1, 2, select_user_variable(user, user_case), mcf1)
 		else
-			hours_worksheet.write(row-1, 1, user.name, cell_format_2)
-			hours_worksheet.write_number(row-1, 2, user.hours_total, merged_cell_format_2)
+			worksheet.write(row-1, 1, user.name, cf2)
+			worksheet.write(row-1, 2, select_user_variable(user, user_case), mcf2)
 		end
 
 		team = user.team
 		row += 1
-		sum += user.hours_total if !user.hours_total.nil?
+		sum += select_user_variable(user, user_case) if !select_user_variable(user, user_case).nil?
 	end
 
 	#processing for last team
@@ -154,32 +179,15 @@ def write_to_excel(users)
 	totals = "D#{team_start}:D#{row-1}, #{sum}"
 			
 	if alternate_count == true
-		hours_worksheet.merge_range(team_names, team, title_format_1)
-		hours_worksheet.merge_range(totals, sum, cell_format_1)
+		worksheet.merge_range(team_names, team, tf1)
+		worksheet.merge_range(totals, sum, cf1)
 	else
-		hours_worksheet.merge_range(team_names, team, title_format_2)
-		hours_worksheet.merge_range(totals, sum, cell_format_2)
+		worksheet.merge_range(team_names, team, tf2)
+		worksheet.merge_range(totals, sum, cf2)
 	end
-
-
-	###############################
-	# Writes data for open tickets
-	###############################
-
-
-	workbook.close
+	
 end
 
-####################################
-# Writes column headers to excel doc
-####################################
-def write_headers_to_excel(workbook, worksheet, users, title, title2)
-	column_format = workbook.add_format(:valign  => 'vcenter', :align   => 'center', :bg_color => 'green')
-	worksheet.write(0,0, "Team", column_format)
-	worksheet.write(0,1, "Owner", column_format)
-	worksheet.write(0,2, title, column_format)
-	worksheet.write(0,3, title2, column_format)
-end
 
 ###############
 # Main Function
@@ -190,7 +198,7 @@ def run_forrest_run
 	start_date = Date.new(2016,01,01)
 	end_date = Date.new(2016,01,31)
 
-	#read in data
+	#set csv paths
 	users_csv = 'C:\Users\caleb\Dropbox\KPICSV\userList.csv'
 	cases_csv = 'C:\Users\caleb\Dropbox\KPICSV\CogentCase.csv'
 	tasks_csv = 'C:\Users\caleb\Dropbox\KPICSV\CaseTask_Hours2.csv'
@@ -200,7 +208,25 @@ def run_forrest_run
 	users.sort! {|x, y| x.team <=> y.team}
 	users.each {|x| x.generate_statistics(start_date, end_date)}
 
-	write_to_excel(users)
+	#write_to_excel(users)
+
+	workbook = WriteExcel.new('./test.xls')
+	tf1, tf2, cf1, cf2, mcf1, mcf2 = generate_styles(workbook)
+
+	hours_worksheet = workbook.add_worksheet('Hours')
+	write_headers_to_excel(workbook, hours_worksheet, users, "Hours Sum", "Hours Sum Per Team")
+	write_worksheet(hours_worksheet, users, 'hours', tf1, tf2, cf1, cf2, mcf1, mcf2)
+
+	open_worksheet = workbook.add_worksheet('Open_Cases')
+	write_headers_to_excel(workbook, open_worksheet, users, "Open Sum", "Open Sum Per Team")
+	write_worksheet(open_worksheet, users, 'open', tf1, tf2, cf1, cf2, mcf1, mcf2)
+
+	closed_worksheet = workbook.add_worksheet('Closed_Cases')
+	write_headers_to_excel(workbook, closed_worksheet, users, "Closed Sum", "Closed Sum Per Team")
+	write_worksheet(closed_worksheet, users, 'closed', tf1, tf2, cf1, cf2, mcf1, mcf2)
+	
+
+	workbook.close
 end
 
 run_forrest_run()
