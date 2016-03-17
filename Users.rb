@@ -1,5 +1,5 @@
 class User
-	attr_accessor :user_id, :a_number, :name, :team, :cases, :tasks, :created_cases, :closed_cases, :open_cases, :hours_total
+	attr_accessor :user_id, :a_number, :name, :team, :cases, :tasks, :created_cases, :closed_cases, :open_cases, :inactive_cases, :hours_total
 
 	def initialize(user_id, a_number, name, team)
 		@user_id = user_id
@@ -8,7 +8,8 @@ class User
 		@team = team
 		@cases = []
 		@tasks = []
-		@created_cases = @closed_cases = @open_cases = @hours_total = 0
+		@created_cases = @closed_cases = @open_cases = 
+		@inactive_cases =  @hours_total = 0
 	end
 
 	def add_cases(ticket)

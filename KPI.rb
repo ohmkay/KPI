@@ -8,7 +8,7 @@ require_relative ('Users')
 # This function takes 3 CSV files and parses the data (line by line) into their 
 # appropriate class.  It utilizes the global variable $users to hold all data
 #####################################################################################
-def read_data(users_csv, cases_csv, tasks_csv)
+def read_data(users_csv, cases_csv, tasks_csv, start_date, end_date)
 
 	users = []
 
@@ -35,29 +35,24 @@ def read_data(users_csv, cases_csv, tasks_csv)
 
 	#case list processing
 	cases_csv.each do |line|
-		create_date = line[3]
-		create_date = Date.strptime(create_date, "%m/%d/%Y %H:%M:%S") if !create_date.nil?
-
-		close_date = line[5]
-		close_date = Date.strptime(close_date, "%m/%d/%Y %H:%M:%S") if !close_date.nil?
-		
+		status = line[2]
+		create_date = Date.strptime(line[3], "%m/%d/%Y %H:%M:%S") if !line[3].nil?
+		close_date = Date.strptime(line[5], "%m/%d/%Y %H:%M:%S") if !line[5].nil?
 		a_number = line[1]
 
 		users.select do |user|
-			user.add_cases(Struct::Case.new(create_date, close_date, a_number)) if user.a_number == a_number
+			user.add_cases(Struct::Case.new(create_date, close_date, a_number)) if (user.a_number == a_number) && (status != -1 && (close_date.nil? || (close_date > start_date)))
 		end
 	end
 
 	#task list processing
 	tasks_csv.each do |line|
-		complete_date = line[6]
-		complete_date = Date.strptime(complete_date, "%m/%d/%Y %H:%M:%S") if !complete_date.nil?
-
+		complete_date = Date.strptime(line[6], "%m/%d/%Y %H:%M:%S") if !line[6].nil?
 	 	a_number = line[3]
 		hours = line[11].to_f
 		
 		users.select do |user|
-			user.add_tasks(Struct::Task.new(complete_date, a_number, hours)) if user.a_number == a_number
+			user.add_tasks(Struct::Task.new(complete_date, a_number, hours)) if (user.a_number == a_number) && (complete_date.nil? || (complete_date >= start_date && complete_date <= end_date))
 		end
 	end
 	return users
@@ -74,9 +69,9 @@ def write_headers_to_excel(workbook, worksheet, users, title, title2)
 	worksheet.write(0,3, title2, column_format)
 end
 
-###########################
-# Generate worksheet styles
-###########################
+#######################################################
+# Generate worksheet styles for alternating team colors
+#######################################################
 def generate_styles(workbook)
 	title_format_1 = workbook.add_format(
 		:valign  => 'vcenter', 
@@ -124,6 +119,8 @@ def select_user_variable(user, user_case)
 	case user_case
 	when 'hours'
 		user.hours_total
+	when 'created'
+		user.created_cases
 	when 'open'
 		user.open_cases
 	when 'closed'
@@ -204,7 +201,7 @@ def run_forrest_run
 	tasks_csv = 'C:\Users\caleb\Dropbox\KPICSV\CaseTask_Hours2.csv'
 
 	#read in data from CSV into array users of User class
-	users = read_data(users_csv, cases_csv, tasks_csv)
+	users = read_data(users_csv, cases_csv, tasks_csv, start_date, end_date)
 	users.sort! {|x, y| x.team <=> y.team}
 	users.each {|x| x.generate_statistics(start_date, end_date)}
 
