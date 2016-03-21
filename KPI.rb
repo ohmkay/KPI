@@ -5,10 +5,10 @@ require 'WriteExcel'
 require_relative ('Users')
 
 #####################################################################################
-# This function takes 3 CSV files and parses the data (line by line) into their 
+# This function takes CSV files and parses the data (line by line) into their 
 # appropriate class.  It utilizes the global variable $users to hold all data
 #####################################################################################
-def read_data(users_csv, cases_csv, tasks_csv)
+def read_data(users_csv, cases_csv, tasks_csv, correspondence_csv)
 
 	users = []
 
@@ -16,11 +16,13 @@ def read_data(users_csv, cases_csv, tasks_csv)
 	users_csv = CSV.read(users_csv)
 	cases_csv = CSV.read(cases_csv)
 	tasks_csv = CSV.read(tasks_csv)
+	correspondence_csv = CSV.read(correspondence_csv)
 
 	#remove headers from CSV
 	users_csv.slice!(0)
 	cases_csv.slice!(0)
 	tasks_csv.slice!(0)
+	correspondence_csv.slice!(0)
 
 	#user list processing
 	users_csv.each do |line|
@@ -129,12 +131,10 @@ def select_user_variable(user, user_case)
 	when 'closed'
 		user.closed_cases
 	end
-end
-
+end 
 #####################
 # Generate Statistics
-#####################
-def write_worksheet(worksheet, users, user_case, tf1, tf2, cf1, cf2, mcf1, mcf2)
+ def write_worksheet(worksheet, users, user_case, tf1, tf2, cf1, cf2, mcf1, mcf2)
 	
 	row, sum = 2, 0
 	team = users[0].team
@@ -202,9 +202,10 @@ def run_forrest_run
 	users_csv = 'C:\Users\caleb\Dropbox\KPICSV\userList.csv'
 	cases_csv = 'C:\Users\caleb\Dropbox\KPICSV\CogentCase.csv'
 	tasks_csv = 'C:\Users\caleb\Dropbox\KPICSV\CaseTask_Hours2.csv'
+	correspondence_csv = 'C:\Users\caleb\Dropbox\KPICSV\CaseCorrespondence.csv'
 
 	#read in data from CSV into array users of User class
-	users = read_data(users_csv, cases_csv, tasks_csv)
+	users = read_data(users_csv, cases_csv, tasks_csv, correspondence_csv)
 	users.sort! {|x, y| x.team <=> y.team}
 	users.each {|x| x.generate_statistics(start_date, end_date)}
 
@@ -224,6 +225,9 @@ def run_forrest_run
 	closed_worksheet = workbook.add_worksheet('Closed_Cases')
 	write_headers_to_excel(workbook, closed_worksheet, users, "Closed Sum", "Closed Sum Per Team")
 	write_worksheet(closed_worksheet, users, 'closed', tf1, tf2, cf1, cf2, mcf1, mcf2)
+
+	inactive_worksheet = workbook.add_worksheet('Inactive')
+	write_headers_to_excel(workbook, closed_worksheet, users, "Inactive Sum", "Inactive Sum Per Team")
 	
 
 	workbook.close
