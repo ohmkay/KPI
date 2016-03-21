@@ -37,13 +37,14 @@ def read_data(users_csv, cases_csv, tasks_csv, correspondence_csv, start_date, e
 
 	#case list processing
 	cases_csv.each do |line|
+		case_number = line[0]
 		status = line[2]
 		create_date = Date.strptime(line[3], "%m/%d/%Y %H:%M:%S") if !line[3].nil?
 		close_date = Date.strptime(line[5], "%m/%d/%Y %H:%M:%S") if !line[5].nil?
 		a_number = line[1]
 
 		users.select do |user|
-			user.add_cases(Struct::Case.new(create_date, close_date, a_number)) if (user.a_number == a_number) && (status != -1 && (close_date.nil? || (close_date > start_date)))
+			user.add_cases(Struct::Case.new(case_number, create_date, close_date, a_number)) if (user.a_number == a_number) && (status != -1 && (close_date.nil? || (close_date > start_date)))
 		end
 	end
 
@@ -57,6 +58,38 @@ def read_data(users_csv, cases_csv, tasks_csv, correspondence_csv, start_date, e
 			user.add_tasks(Struct::Task.new(complete_date, a_number, hours)) if (user.a_number == a_number) && (complete_date.nil? || (complete_date >= start_date && complete_date <= end_date))
 		end
 	end
+
+	#sort the correspondence by case number followed by entry date
+	correspondence_csv.sort_by! do |x, y| 
+		[x[1], x[3]] <=> [y[1], y[3]]
+	end
+
+	previous_case_number = nil
+	previous_entry_date = nil
+
+	#correspondence list processing
+	correspondence_csv.each do |line|
+		case_number = line[1]
+		entry_date = Date.strptime(line[3], "%m/%d/%Y %H:%M:%S") unless line[3].nil?
+
+		puts "Case No: #{case_number}, Previous Case No: #{previous_case_number}"
+		puts "Entry Date: #{entry_date}, Previous Entry Date: #{previous_entry_date}"
+
+		#changes flag to inactive if case has no correspondence every 7 days
+		if ((case_number == previous_case_number) && !previous_case_number.nil?)
+			if ((entry_date > previous_entry_date + 7) && !previous_entry_date.nil?)
+				users.select do |user|
+					cases.select do |ticket|
+						ticket.inactive = true if previous_case_number == case_number
+					end
+				end
+			end
+		end
+
+		previous_case_number = case_number
+		previous_entry_date = entry_date
+	end
+
 	return users
 end
 
@@ -127,6 +160,8 @@ def select_user_variable(user, user_case)
 		user.open_cases
 	when 'closed'
 		user.closed_cases
+	when 'inactive'
+		user.inactive_cases
 	end
 end 
 #####################
@@ -225,7 +260,8 @@ def run_forrest_run
 	write_worksheet(closed_worksheet, users, 'closed', tf1, tf2, cf1, cf2, mcf1, mcf2)
 
 	inactive_worksheet = workbook.add_worksheet('Inactive')
-	write_headers_to_excel(workbook, closed_worksheet, users, "Inactive Sum", "Inactive Sum Per Team")
+	write_headers_to_excel(workbook, inactive_worksheet, users, "Inactive Sum", "Inactive Sum Per Team")
+	write_worksheet(inactive_worksheet, users, 'inactive', tf1, tf2, cf1, cf2, mcf1, mcf2)
 	
 
 	workbook.close
