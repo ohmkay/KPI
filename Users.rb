@@ -39,4 +39,3 @@ end
 
 Struct.new("Case", :create_date, :close_date, :a_number, :correspondence)
 Struct.new("Task", :complete_date, :a_number, :hours)
-Struct.new("Correspondence", :entry_date)
