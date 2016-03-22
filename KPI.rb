@@ -13,6 +13,7 @@ def read_data(users_csv, cases_csv, tasks_csv, correspondence_csv, start_date, e
 	users = []
 
 	#read string as path
+	puts "Reading CSV data..." 
 	users_csv = CSV.read(users_csv)
 	cases_csv = CSV.read(cases_csv)
 	tasks_csv = CSV.read(tasks_csv)
@@ -25,6 +26,7 @@ def read_data(users_csv, cases_csv, tasks_csv, correspondence_csv, start_date, e
 	correspondence_csv.slice!(0)
 
 	#user list processing
+	puts "Processing Users..."
 	users_csv.each do |line|
 	 	user_id = line[0]
 	 	team = line[2]
@@ -36,6 +38,7 @@ def read_data(users_csv, cases_csv, tasks_csv, correspondence_csv, start_date, e
 	end
 
 	#case list processing
+	puts "Processing Cases..."
 	cases_csv.each do |line|
 		case_number = line[0]
 		status = line[2]
@@ -49,6 +52,7 @@ def read_data(users_csv, cases_csv, tasks_csv, correspondence_csv, start_date, e
 	end
 
 	#task list processing
+	puts "Processing Tasks..."
 	tasks_csv.each do |line|
 		complete_date = Date.strptime(line[6], "%m/%d/%Y %H:%M:%S") if !line[6].nil?
 	 	a_number = line[3]
@@ -60,6 +64,7 @@ def read_data(users_csv, cases_csv, tasks_csv, correspondence_csv, start_date, e
 	end
 
 	#sort the correspondence by case number followed by entry date
+	puts "Sorting Correspondence..."
 	correspondence_csv.sort_by! do |x, y| 
 		[x[1], x[3]] <=> [y[1], y[3]]
 	end
@@ -68,16 +73,23 @@ def read_data(users_csv, cases_csv, tasks_csv, correspondence_csv, start_date, e
 	previous_entry_date = nil
 
 	#correspondence list processing
+	puts "Processing Correspondence..."
 	correspondence_csv.each do |line|
 		case_number = line[1]
 		entry_date = Date.strptime(line[3], "%m/%d/%Y %H:%M:%S") unless line[3].nil?
 
-		puts "Case No: #{case_number}, Previous Case No: #{previous_case_number}"
-		puts "Entry Date: #{entry_date}, Previous Entry Date: #{previous_entry_date}"
+		#puts "Case No: #{case_number}, Previous Case No: #{previous_case_number}"
+		#puts "Entry Date: #{entry_date}, Previous Entry Date: #{previous_entry_date}"
+
+		#test_Date = previous_entry_date + 7 if !previous_entry_date.nil?
+		#puts ""
+		#puts "Previous: #{previous_entry_date}"
+		#puts "Added: #{test_Date}"
 
 		#changes flag to inactive if case has no correspondence every 7 days
 		if ((case_number == previous_case_number) && !previous_case_number.nil?)
 			if ((entry_date > previous_entry_date + 7) && !previous_entry_date.nil?)
+				puts "SUCCESS"
 				users.select do |user|
 					cases.select do |ticket|
 						ticket.inactive = true if previous_case_number == case_number
