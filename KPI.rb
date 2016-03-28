@@ -42,8 +42,10 @@ def read_data(users_csv, cases_csv, tasks_csv, correspondence_csv, start_date, e
 	cases_csv.each do |line|
 		case_number = line[0]
 		status = line[2]
-		create_date = Date.strptime(line[3], "%m/%d/%Y %H:%M:%S") if !line[3].nil?
-		close_date = Date.strptime(line[5], "%m/%d/%Y %H:%M:%S") if !line[5].nil?
+		create_date = line[3]
+		close_date = line[5]
+		create_date = Date.strptime(create_date, "%m/%d/%Y %H:%M:%S") unless create_date.nil?
+		close_date = Date.strptime(close_date, "%m/%d/%Y %H:%M:%S") unless close_date.nil?
 		a_number = line[1]
 
 		users.select do |user|
@@ -54,7 +56,8 @@ def read_data(users_csv, cases_csv, tasks_csv, correspondence_csv, start_date, e
 	#task list processing
 	puts "Processing Tasks..."
 	tasks_csv.each do |line|
-		complete_date = Date.strptime(line[6], "%m/%d/%Y %H:%M:%S") if !line[6].nil?
+		complete_date = line[6]
+		complete_date = Date.strptime(complete_date, "%m/%d/%Y %H:%M:%S") unless complete_date.nil?
 	 	a_number = line[3]
 		hours = line[11].to_f
 		
@@ -76,7 +79,8 @@ def read_data(users_csv, cases_csv, tasks_csv, correspondence_csv, start_date, e
 	puts "Processing Correspondence..."
 	correspondence_csv.each do |line|
 		case_number = line[1]
-		entry_date = Date.strptime(line[3], "%m/%d/%Y %H:%M:%S") unless line[3].nil?
+		entry_date = line[3]
+		entry_date = Date.strptime(entry_date, "%m/%d/%Y %H:%M") unless entry_date.nil?
 
 		#puts "Case No: #{case_number}, Previous Case No: #{previous_case_number}"
 		#puts "Entry Date: #{entry_date}, Previous Entry Date: #{previous_entry_date}"
@@ -89,10 +93,9 @@ def read_data(users_csv, cases_csv, tasks_csv, correspondence_csv, start_date, e
 		#changes flag to inactive if case has no correspondence every 7 days
 		if ((case_number == previous_case_number) && !previous_case_number.nil?)
 			if ((entry_date > previous_entry_date + 7) && !previous_entry_date.nil?)
-				puts "SUCCESS"
 				users.select do |user|
-					cases.select do |ticket|
-						ticket.inactive = true if previous_case_number == case_number
+					user.cases.select do |ticket|
+						ticket.inactive = true if case_number == ticket.case_number
 					end
 				end
 			end
@@ -102,6 +105,12 @@ def read_data(users_csv, cases_csv, tasks_csv, correspondence_csv, start_date, e
 		previous_entry_date = entry_date
 	end
 
+	#users.each do |user|
+	#	user.cases.each do |ticket|
+	#		puts "#{ticket.case_number} - #{ticket.inactive}"
+	#	end
+	#end
+
 	return users
 end
 
@@ -109,7 +118,8 @@ end
 # Writes column headers to excel doc
 ####################################
 def write_headers_to_excel(workbook, worksheet, users, title, title2)
-	column_format = workbook.add_format(:valign  => 'vcenter', :align   => 'center', :bg_color => 'green')
+	column_format = workbook.add_format(:valign  => 'vcenter', :align   => 'center', 
+					:bg_color => 'gray', :bold => 1)
 	worksheet.write(0,0, "Team", column_format)
 	worksheet.write(0,1, "Owner", column_format)
 	worksheet.write(0,2, title, column_format)
@@ -120,39 +130,42 @@ end
 # Generate worksheet styles for alternating team colors
 #######################################################
 def generate_styles(workbook)
+	color_blue = workbook.set_custom_color(40, '#33CCFF')
+	color_orange = workbook.set_custom_color(41, '#FFCC33')
+
 	title_format_1 = workbook.add_format(
 		:valign  => 'vcenter', 
 		:align   => 'center',
 		:rotation => '90', 
-		:bold => true,
-		:bg_color => 'blue'	
+		:bold => 1,
+		:bg_color => color_blue	
 	)
 	title_format_2 = workbook.add_format(
 		:valign  => 'vcenter', 
 		:align   => 'center',
 		:rotation => '90', 
-		:bold => true,
-		:bg_color => 'red'	
+		:bold => 1,
+		:bg_color => color_orange	
 	)
 	cell_format_1 = workbook.add_format(
 		:valign  => 'vcenter', 
 		:align   => 'center',
-		:bg_color => 'blue'
+		:bg_color => color_blue
 	)
 	cell_format_2 = workbook.add_format(
 		:valign  => 'vcenter', 
 		:align   => 'center',
-		:bg_color => 'red'
+		:bg_color => color_orange
 	)
 	merged_cell_format_1 = workbook.add_format(
 		:valign  => 'vcenter', 
 		:align   => 'center',
-		:bg_color => 'blue'
+		:bg_color => color_blue
 	)
 	merged_cell_format_2 = workbook.add_format(
 		:valign  => 'vcenter', 
 		:align   => 'center',
-		:bg_color => 'red'
+		:bg_color => color_orange
 	)
 
 	return title_format_1, title_format_2, cell_format_1, cell_format_2, 
@@ -176,6 +189,7 @@ def select_user_variable(user, user_case)
 		user.inactive_cases
 	end
 end 
+
 #####################
 # Generate Statistics
  def write_worksheet(worksheet, users, user_case, tf1, tf2, cf1, cf2, mcf1, mcf2)
@@ -246,7 +260,7 @@ def run_forrest_run
 	users_csv = 'C:\Users\caleb\Dropbox\KPICSV\userList.csv'
 	cases_csv = 'C:\Users\caleb\Dropbox\KPICSV\CogentCase.csv'
 	tasks_csv = 'C:\Users\caleb\Dropbox\KPICSV\CaseTask_Hours2.csv'
-	correspondence_csv = 'C:\Users\caleb\Dropbox\KPICSV\CaseCorrespondence.csv'
+	correspondence_csv = 'C:\Users\caleb\Dropbox\KPICSV\CaseCorrespondence2.csv'
 
 	#read in data from CSV into array users of User class
 	users = read_data(users_csv, cases_csv, tasks_csv, correspondence_csv, start_date, end_date)
