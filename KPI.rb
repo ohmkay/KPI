@@ -119,12 +119,6 @@ def read_data(users_csv_path, cases_csv_path, tasks_csv_path, correspondence_csv
 		previous_entry_date = entry_date
 	end
 
-	#users.each do |user|
-	#	user.cases.each do |ticket|
-	#		puts "#{ticket.case_number} - #{ticket.inactive}"
-	#	end
-	#end
-
 	return users
 end
 
@@ -288,15 +282,6 @@ def run_forrest_run
 	#generate stats for each user via the user class
 	users.each {|x| x.generate_statistics(start_date, end_date)}
 
-	#users.select do |user|
-	#	if user.name == 'Sweeney,Caleb'
-	#		puts "#{user.inactive_cases}"
-	#		user.cases.select do |ticket|
-	#			puts "#{ticket.case_number} - #{ticket.create_date} - #{ticket.close_date} - #{ticket.inactive}"
-	#		end
-	#	end
-	#end
-
 	#change this for the output filename/path
 	workbook = WriteExcel.new('./test.xls')
 	tf1, tf2, cf1, cf2, mcf1, mcf2 = generate_styles(workbook)
@@ -305,18 +290,22 @@ def run_forrest_run
 	#Worksheet Creation
 	###################
 	hours_worksheet = workbook.add_worksheet('Hours')
+	hours_worksheet.set_column('B:B', 20)
 	write_headers_to_excel(workbook, hours_worksheet, users, "Hours Sum", "Hours Sum Per Team")
 	write_worksheet(hours_worksheet, users, 'hours', tf1, tf2, cf1, cf2, mcf1, mcf2)
 
 	open_worksheet = workbook.add_worksheet('Open_Cases')
+	open_worksheet.set_column('B:B', 20)
 	write_headers_to_excel(workbook, open_worksheet, users, "Open Sum", "Open Sum Per Team")
 	write_worksheet(open_worksheet, users, 'open', tf1, tf2, cf1, cf2, mcf1, mcf2)
 
 	closed_worksheet = workbook.add_worksheet('Closed_Cases')
+	closed_worksheet.set_column('B:B', 20)
 	write_headers_to_excel(workbook, closed_worksheet, users, "Closed Sum", "Closed Sum Per Team")
 	write_worksheet(closed_worksheet, users, 'closed', tf1, tf2, cf1, cf2, mcf1, mcf2)
 
 	inactive_worksheet = workbook.add_worksheet('Inactive')
+	inactive_worksheet.set_column('B:B', 20)
 	write_headers_to_excel(workbook, inactive_worksheet, users, "Inactive Sum", "Inactive Sum Per Team")
 	write_worksheet(inactive_worksheet, users, 'inactive', tf1, tf2, cf1, cf2, mcf1, mcf2)
 	
