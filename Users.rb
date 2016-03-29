@@ -27,9 +27,7 @@ class User
 			@closed_cases += 1 if (!ticket[:close_date].nil? && (ticket[:close_date] <= end_date && ticket[:close_date] >= start_date))	
 			@open_cases += 1 if (ticket[:close_date].nil? || ticket[:close_date] <= end_date)
 			@inactive_cases += 1 if (ticket[:inactive] == true)
-			#puts "#{ticket[:case_number]}" if (ticket[:inactive] == true)
 		end
-
 
 		tasks.each do |task|
 			@hours_total += task[:hours] if (!task[:hours].nil? && !task[:complete_date].nil?) && 

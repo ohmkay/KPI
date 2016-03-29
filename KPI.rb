@@ -8,30 +8,28 @@ require_relative ('Users')
 # This function takes CSV files and parses the data (line by line) into their 
 # appropriate class.  It utilizes the global variable $users to hold all data
 #####################################################################################
-def read_data(users_csv, cases_csv, tasks_csv, correspondence_csv, start_date, end_date)
+def read_data(users_csv_path, cases_csv_path, tasks_csv_path, correspondence_csv_path, start_date, end_date)
 
 	users = []
 
 	#read string as path
 	puts "Reading CSV data..." 
-	users_csv = CSV.read(users_csv)
-	cases_csv = CSV.read(cases_csv)
-	tasks_csv = CSV.read(tasks_csv)
-	correspondence_csv = CSV.read(correspondence_csv)
+	users_csv = CSV.read(users_csv_path, {encoding: "UTF-8", headers: true, header_converters: :symbol, converters: :all})
+	cases_csv = CSV.read(cases_csv_path, {encoding: "UTF-8", headers: true, header_converters: :symbol, converters: :all})
+	tasks_csv = CSV.read(tasks_csv_path, {encoding: "UTF-8", headers: true, header_converters: :symbol, converters: :all})
 
-	#remove headers from CSV
-	users_csv.slice!(0)
-	cases_csv.slice!(0)
-	tasks_csv.slice!(0)
-	correspondence_csv.slice!(0)
+	correspondence_csv = []
+	CSV.foreach(correspondence_csv_path, {encoding: "UTF-8", headers: true, header_converters: :symbol, converters: :all}) do |row|
+  		correspondence_csv << row if Date.strptime(row[3], "%m/%d/%Y %H:%M") >= start_date 
+	end
 
 	#user list processing
 	puts "Processing Users..."
 	users_csv.each do |line|
-	 	user_id = line[0]
-	 	team = line[2]
-		name = line[1]
-		a_number = line[3]
+	 	user_id = line[:user_id]
+	 	team = line[:team]
+		name = line[:name]
+		a_number = line[:a_number]
 
 		temp_user = User.new(user_id, a_number, name, team)
 		users.push(temp_user)
@@ -40,13 +38,13 @@ def read_data(users_csv, cases_csv, tasks_csv, correspondence_csv, start_date, e
 	#case list processing
 	puts "Processing Cases..."
 	cases_csv.each do |line|
-		case_number = line[0]
-		status = line[2]
-		create_date = line[3]
-		close_date = line[5]
+		case_number = line[:caseno]
+		status = line[:status]
+		create_date = line[:createdate]
+		close_date = line[:closedate]
 		create_date = Date.strptime(create_date, "%m/%d/%Y %H:%M:%S") unless create_date.nil?
 		close_date = Date.strptime(close_date, "%m/%d/%Y %H:%M:%S") unless close_date.nil?
-		a_number = line[1]
+		a_number = line[:owner]
 
 		users.select do |user|
 			user.add_cases(Struct::Case.new(case_number, create_date, close_date, a_number)) if (user.a_number == a_number) && (status != -1 && (close_date.nil? || (close_date > start_date)))
@@ -56,10 +54,10 @@ def read_data(users_csv, cases_csv, tasks_csv, correspondence_csv, start_date, e
 	#task list processing
 	puts "Processing Tasks..."
 	tasks_csv.each do |line|
-		complete_date = line[6]
+		complete_date = line[:completedate]
 		complete_date = Date.strptime(complete_date, "%m/%d/%Y %H:%M:%S") unless complete_date.nil?
-	 	a_number = line[3]
-		hours = line[11].to_f
+	 	a_number = line[:taskowner]
+		hours = line[:actualhours].to_f
 		
 		users.select do |user|
 			user.add_tasks(Struct::Task.new(complete_date, a_number, hours)) if (user.a_number == a_number) && (complete_date.nil? || (complete_date >= start_date && complete_date <= end_date))
@@ -68,34 +66,40 @@ def read_data(users_csv, cases_csv, tasks_csv, correspondence_csv, start_date, e
 
 	#sort the correspondence by case number followed by entry date
 	puts "Sorting Correspondence..."
-	correspondence_csv.sort_by! do |x, y| 
-		[x[1], x[3]] <=> [y[1], y[3]]
-	end
+	#puts "#{correspondence_csv.inspect}"
+	correspondence_csv.sort_by! { |x| [x[:caseno], x[:entrydate]]}
 
 	previous_case_number = nil
-	previous_entry_date = nil
+	previous_entry_date = start_date
+
+	#correspondence_csv.each {|line| puts "#{line[1]} - #{line[3]}" if line[3] == 'CN20140177049'}
 
 	#correspondence list processing
 	puts "Processing Correspondence..."
 	correspondence_csv.each do |line|
-		case_number = line[1]
-		entry_date = line[3]
+		case_number = line[:caseno]
+		entry_date = line[:entrydate]
 		entry_date = Date.strptime(entry_date, "%m/%d/%Y %H:%M") unless entry_date.nil?
+		#puts "#{case_number} - #{entry_date}"
+		if previous_case_number != case_number
+			previous_entry_date = start_date
+		end
 
-		#puts "Case No: #{case_number}, Previous Case No: #{previous_case_number}"
-		#puts "Entry Date: #{entry_date}, Previous Entry Date: #{previous_entry_date}"
-
-		#test_Date = previous_entry_date + 7 if !previous_entry_date.nil?
-		#puts ""
-		#puts "Previous: #{previous_entry_date}"
-		#puts "Added: #{test_Date}"
-
-		#changes flag to inactive if case has no correspondence every 7 days
-		if ((case_number == previous_case_number) && !previous_case_number.nil?)
-			if ((entry_date > previous_entry_date + 7) && !previous_entry_date.nil?)
-				users.select do |user|
-					user.cases.select do |ticket|
-						ticket.inactive = true if case_number == ticket.case_number
+		#confirms if inactivity is in given date range
+		if ((entry_date >= start_date) && (entry_date <= end_date))
+			#checks if case number is the same as the previous case number
+			if ((case_number == previous_case_number) && !previous_case_number.nil?)
+				#checks if the dates are greater than 7 days apart
+				#puts "#{entry_date} - #{previous_entry_date}"
+				if ((entry_date > previous_entry_date + 7) && !previous_entry_date.nil?)
+					#finds ticket to mark inactive 
+					users.select do |user|
+						user.cases.select do |ticket|
+							if (case_number == ticket.case_number)
+								ticket.inactive = true 
+								puts "YES #{ticket.case_number} - #{entry_date} - #{previous_entry_date}"
+							end
+						end
 					end
 				end
 			end
@@ -104,6 +108,9 @@ def read_data(users_csv, cases_csv, tasks_csv, correspondence_csv, start_date, e
 		previous_case_number = case_number
 		previous_entry_date = entry_date
 	end
+
+	
+
 
 	#users.each do |user|
 	#	user.cases.each do |ticket|
@@ -118,8 +125,11 @@ end
 # Writes column headers to excel doc
 ####################################
 def write_headers_to_excel(workbook, worksheet, users, title, title2)
-	column_format = workbook.add_format(:valign  => 'vcenter', :align   => 'center', 
-					:bg_color => 'gray', :bold => 1)
+	column_format = workbook.add_format(
+		:valign  => 'vcenter', 
+		:align   => 'center', 
+		:bg_color => 'gray', 
+		:bold => 1)
 	worksheet.write(0,0, "Team", column_format)
 	worksheet.write(0,1, "Owner", column_format)
 	worksheet.write(0,2, title, column_format)
@@ -260,13 +270,22 @@ def run_forrest_run
 	users_csv = 'C:\Users\caleb\Dropbox\KPICSV\userList.csv'
 	cases_csv = 'C:\Users\caleb\Dropbox\KPICSV\CogentCase.csv'
 	tasks_csv = 'C:\Users\caleb\Dropbox\KPICSV\CaseTask_Hours2.csv'
-	correspondence_csv = 'C:\Users\caleb\Dropbox\KPICSV\CaseCorrespondence2.csv'
+	correspondence_csv = 'C:\Users\caleb\Dropbox\KPICSV\CaseCorrespondence.csv'
 
 	#read in data from CSV into array users of User class
 	users = read_data(users_csv, cases_csv, tasks_csv, correspondence_csv, start_date, end_date)
 	
 	users.sort! {|x, y| x.team <=> y.team}
 	users.each {|x| x.generate_statistics(start_date, end_date)}
+
+	#users.select do |user|
+	#	if user.name == 'Sweeney,Caleb'
+	#		puts "#{user.inactive_cases}"
+	#		user.cases.select do |ticket|
+	#			puts "#{ticket.case_number} - #{ticket.create_date} - #{ticket.close_date} - #{ticket.inactive}"
+	#		end
+	#	end
+	#end
 
 	#write_to_excel(users)
 
