@@ -66,13 +66,10 @@ def read_data(users_csv_path, cases_csv_path, tasks_csv_path, correspondence_csv
 
 	#sort the correspondence by case number followed by entry date
 	puts "Sorting Correspondence..."
-	#puts "#{correspondence_csv.inspect}"
 	correspondence_csv.sort_by! { |x| [x[:caseno], x[:entrydate]]}
 
 	previous_case_number = nil
 	previous_entry_date = start_date
-
-	#correspondence_csv.each {|line| puts "#{line[1]} - #{line[3]}" if line[3] == 'CN20140177049'}
 
 	#correspondence list processing
 	puts "Processing Correspondence..."
@@ -80,8 +77,22 @@ def read_data(users_csv_path, cases_csv_path, tasks_csv_path, correspondence_csv
 		case_number = line[:caseno]
 		entry_date = line[:entrydate]
 		entry_date = Date.strptime(entry_date, "%m/%d/%Y %H:%M") unless entry_date.nil?
-		#puts "#{case_number} - #{entry_date}"
+
+		#changes date check to start date if case changes
 		if previous_case_number != case_number
+
+			#checks if last correspondence has gap between itself and last day of the period
+			if end_date > previous_entry_date + 7
+				users.select do |user|
+					user.cases.select do |ticket|
+						if previous_case_number == ticket.case_number
+							ticket.inactive = true
+							puts "YES #2 #{ticket.case_number} - #{end_date} - #{previous_entry_date}"
+						end
+					end
+				end
+			end
+
 			previous_entry_date = start_date
 		end
 
@@ -90,7 +101,6 @@ def read_data(users_csv_path, cases_csv_path, tasks_csv_path, correspondence_csv
 			#checks if case number is the same as the previous case number
 			if ((case_number == previous_case_number) && !previous_case_number.nil?)
 				#checks if the dates are greater than 7 days apart
-				#puts "#{entry_date} - #{previous_entry_date}"
 				if ((entry_date > previous_entry_date + 7) && !previous_entry_date.nil?)
 					#finds ticket to mark inactive 
 					users.select do |user|
@@ -108,9 +118,6 @@ def read_data(users_csv_path, cases_csv_path, tasks_csv_path, correspondence_csv
 		previous_case_number = case_number
 		previous_entry_date = entry_date
 	end
-
-	
-
 
 	#users.each do |user|
 	#	user.cases.each do |ticket|
@@ -263,8 +270,8 @@ end
 def run_forrest_run
 
 	#Change these dates
-	start_date = Date.new(2016,01,01)
-	end_date = Date.new(2016,01,31)
+	start_date = Date.new(2016,02,01)
+	end_date = Date.new(2016,02,29)
 
 	#set csv paths
 	users_csv = 'C:\Users\caleb\Dropbox\KPICSV\userList.csv'
@@ -275,7 +282,10 @@ def run_forrest_run
 	#read in data from CSV into array users of User class
 	users = read_data(users_csv, cases_csv, tasks_csv, correspondence_csv, start_date, end_date)
 	
+	#sort users based on team
 	users.sort! {|x, y| x.team <=> y.team}
+
+	#generate stats for each user via the user class
 	users.each {|x| x.generate_statistics(start_date, end_date)}
 
 	#users.select do |user|
@@ -287,11 +297,13 @@ def run_forrest_run
 	#	end
 	#end
 
-	#write_to_excel(users)
-
+	#change this for the output filename/path
 	workbook = WriteExcel.new('./test.xls')
 	tf1, tf2, cf1, cf2, mcf1, mcf2 = generate_styles(workbook)
 
+	###################
+	#Worksheet Creation
+	###################
 	hours_worksheet = workbook.add_worksheet('Hours')
 	write_headers_to_excel(workbook, hours_worksheet, users, "Hours Sum", "Hours Sum Per Team")
 	write_worksheet(hours_worksheet, users, 'hours', tf1, tf2, cf1, cf2, mcf1, mcf2)
