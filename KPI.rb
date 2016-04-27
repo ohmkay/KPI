@@ -4,111 +4,228 @@ require 'time'
 require 'WriteExcel'
 require_relative ('Users')
 
+
 #####################################################################################
-# This function takes 3 CSV files and parses the data (line by line) into their 
+# This function takes CSV files and parses the data (line by line) into their 
 # appropriate class.  It utilizes the global variable $users to hold all data
 #####################################################################################
-def read_data(users_csv, cases_csv, tasks_csv)
+def read_data(users_csv_path, cases_csv_path, tasks_csv_path, correspondence_csv_path, start_date, end_date)
 
 	users = []
 
 	#read string as path
-	users_csv = CSV.read(users_csv)
-	cases_csv = CSV.read(cases_csv)
-	tasks_csv = CSV.read(tasks_csv)
+	puts "Reading CSV data..." 
+	users_csv = CSV.read(users_csv_path, {encoding: "UTF-8", headers: true, header_converters: :symbol, converters: :all})
+	cases_csv = CSV.read(cases_csv_path, {encoding: "UTF-8", headers: true, header_converters: :symbol, converters: :all})
+	tasks_csv = CSV.read(tasks_csv_path, {encoding: "UTF-8", headers: true, header_converters: :symbol, converters: :all})
 
-	#remove headers from CSV
-	users_csv.slice!(0)
-	cases_csv.slice!(0)
-	tasks_csv.slice!(0)
+	correspondence_csv = []
+	CSV.foreach(correspondence_csv_path, {encoding: "UTF-8", headers: true, header_converters: :symbol, converters: :all}) do |row|
+  		correspondence_csv << row if Date.strptime(row[3], "%m/%d/%Y %H:%M") >= start_date 
+	end
 
 	#user list processing
+	puts "Processing Users..."
 	users_csv.each do |line|
-	 	user_id = line[0]
-	 	team = line[2]
-		name = line[1]
-		a_number = line[3]
+	 	user_id = line[:userid]
+	 	team = line[:team]
+		name = line[:name]
+		a_number = line[:a_number]
 
 		temp_user = User.new(user_id, a_number, name, team)
 		users.push(temp_user)
 	end
 
 	#case list processing
+	puts "Processing Cases..."
 	cases_csv.each do |line|
-		create_date = line[3]
-		create_date = Date.strptime(create_date, "%m/%d/%Y %H:%M:%S") if !create_date.nil?
+		case_number = line[:caseno]
+		status = line[:status]
+		create_date = line[:createdate]
+		close_date = line[:closedate]
+		a_number = line[:owner]
 
-		close_date = line[5]
-		close_date = Date.strptime(close_date, "%m/%d/%Y %H:%M:%S") if !close_date.nil?
-		
-		a_number = line[1]
+		create_date = nil if create_date.nil? || create_date.empty?
+		create_date = Date.strptime(create_date, "%m/%d/%Y %H:%M:%S") unless create_date.nil?
+		close_date = nil if close_date.nil? || close_date.empty?
+		close_date = Date.strptime(close_date, "%m/%d/%Y %H:%M:%S") unless close_date.nil?
 
+		#add case to user's case list if anumber matches the user
 		users.select do |user|
-			user.add_cases(Struct::Case.new(create_date, close_date, a_number)) if user.a_number == a_number
+			user.add_cases(Struct::Case.new(case_number, create_date, close_date, a_number)) if user.a_number == a_number
 		end
 	end
 
 	#task list processing
+	puts "Processing Tasks..."
 	tasks_csv.each do |line|
-		complete_date = line[6]
-		complete_date = Date.strptime(complete_date, "%m/%d/%Y %H:%M:%S") if !complete_date.nil?
+		complete_date = line[:completedate]
+		a_number = line[:taskowner]
+		hours = line[:actualhours].to_f
 
-	 	a_number = line[3]
-		hours = line[11].to_f
+		complete_date = nil if complete_date.nil? || complete_date.empty?
+		complete_date = Date.strptime(complete_date, "%m/%d/%Y %H:%M:%S") unless complete_date.nil?
 		
+		#add task to user's task list if anumber matches the user
 		users.select do |user|
 			user.add_tasks(Struct::Task.new(complete_date, a_number, hours)) if user.a_number == a_number
 		end
 	end
+
+	#sort the correspondence by case number followed by entry date
+	puts "Sorting Correspondence..."
+	correspondence_csv.sort_by! { |x| [x[:caseno], x[:entrydate]] }
+
+	previous_case_number = nil
+	previous_entry_date = start_date
+
+	#correspondence list processing
+	puts "Processing Correspondence..."
+	correspondence_csv.each do |line|
+		case_number = line[:caseno]
+		entry_date = line[:entrydate]
+
+		entry_date = nil if entry_date.nil? || entry_date.empty?
+		entry_date = Date.strptime(entry_date, "%m/%d/%Y %H:%M") unless entry_date.nil?
+
+		#changes date check to start date if case changes
+		if previous_case_number != case_number
+
+			#checks if last correspondence has gap between itself and last day of the period
+			if end_date > previous_entry_date + 7
+				users.select do |user|
+					user.cases.select do |ticket|
+						if previous_case_number == ticket.case_number
+							ticket.inactive = true
+							puts "YES #2 #{ticket.case_number} - #{end_date} - #{previous_entry_date}"
+						end
+					end
+				end
+			end
+
+			previous_entry_date = start_date
+		end
+
+		#confirms if inactivity is in given date range
+		if (!entry_date.nil? && (entry_date >= start_date) && (entry_date <= end_date))
+			#checks if case number is the same as the previous case number
+			if ((case_number == previous_case_number) && !previous_case_number.nil?)
+				#checks if the dates are greater than 7 days apart
+				if ((entry_date > previous_entry_date + 7) && !previous_entry_date.nil?)
+					#finds ticket to mark inactive 
+					users.select do |user|
+						user.cases.select do |ticket|
+							if (case_number == ticket.case_number)
+								ticket.inactive = true 
+								puts "YES #{ticket.case_number} - #{entry_date} - #{previous_entry_date}"
+							end
+						end
+					end
+				end
+			end
+		end
+
+		previous_case_number = case_number
+		previous_entry_date = entry_date
+	end
+
 	return users
 end
 
-#####################
-# Generate Statistics
-#####################
-def write_to_excel(users)
-	workbook = WriteExcel.new('../test.xls')
 
-	#creating formats and alternate colors
+####################################
+# Writes column headers to excel doc
+####################################
+def write_headers_to_excel(workbook, worksheet, users, title, title2)
+	column_format = workbook.add_format(
+		:valign  => 'vcenter', 
+		:align   => 'center', 
+		:bg_color => 'gray', 
+		:bold => 1)
+	worksheet.write(0,0, "Team", column_format)
+	worksheet.write(0,1, "Owner", column_format)
+	worksheet.write(0,2, title, column_format)
+	worksheet.write(0,3, title2, column_format)
+end
+
+
+#######################################################
+# Generate worksheet styles for alternating team colors
+#######################################################
+def generate_styles(workbook)
+	color_blue = workbook.set_custom_color(40, '#33CCFF')
+	color_orange = workbook.set_custom_color(41, '#FFCC33')
+
 	title_format_1 = workbook.add_format(
 		:valign  => 'vcenter', 
 		:align   => 'center',
 		:rotation => '90', 
-		:bold => true,
-		:bg_color => 'blue'	
+		:bold => 1,
+		:bg_color => color_blue,
+		:set_color => 'black'
 	)
 	title_format_2 = workbook.add_format(
 		:valign  => 'vcenter', 
 		:align   => 'center',
 		:rotation => '90', 
-		:bold => true,
-		:bg_color => 'red'	
+		:bold => 1,
+		:bg_color => color_orange,
+		:set_color => 'black'
 	)
 	cell_format_1 = workbook.add_format(
 		:valign  => 'vcenter', 
 		:align   => 'center',
-		:bg_color => 'blue'
+		:bg_color => color_blue,
+		:set_color => 'black'
 	)
 	cell_format_2 = workbook.add_format(
 		:valign  => 'vcenter', 
 		:align   => 'center',
-		:bg_color => 'red'
+		:bg_color => color_orange,
+		:set_color => 'black'
 	)
 	merged_cell_format_1 = workbook.add_format(
 		:valign  => 'vcenter', 
 		:align   => 'center',
-		:bg_color => 'blue'
+		:bg_color => color_blue,
+		:set_color => 'black'
 	)
 	merged_cell_format_2 = workbook.add_format(
 		:valign  => 'vcenter', 
 		:align   => 'center',
-		:bg_color => 'red'
+		:bg_color => color_orange,
+		:set_color => 'black'
 	)
 
-	## Hours Worksheet processing ##
-	hours_worksheet = workbook.add_worksheet
-	write_headers_to_excel(workbook, hours_worksheet, users, "Hours Sum", "Hours Sum Per Team")
+	return title_format_1, title_format_2, cell_format_1, cell_format_2, 
+		   merged_cell_format_1, merged_cell_format_2
+end
 
+
+####################################################
+# changes which variable is selected from user class
+####################################################
+def select_user_variable(user, user_case)
+	case user_case
+	when 'hours'
+		user.hours_total
+	when 'created'
+		user.created_cases
+	when 'open'
+		user.open_cases
+	when 'closed'
+		user.closed_cases
+	when 'inactive'
+		user.inactive_cases
+	end
+end 
+
+
+#####################
+# Generate Statistics
+#####################
+ def write_worksheet(worksheet, users, user_case, tf1, tf2, cf1, cf2, mcf1, mcf2)
+	
 	row, sum = 2, 0
 	team = users[0].team
 	team_start = row
@@ -116,17 +233,17 @@ def write_to_excel(users)
 
 	#writes user names and user teams with merged cells with formatting
 	users.each do |user|
-		
+
 		if team != user.team
 			team_names = "A#{team_start}:A#{row-1}, #{team}"
 			totals = "D#{team_start}:D#{row-1}, #{sum}"
 
 			if alternate_count == true
-				hours_worksheet.merge_range(team_names, team, title_format_1)
-				hours_worksheet.merge_range(totals, sum, cell_format_1)
+				worksheet.merge_range(team_names, team, tf1)
+				worksheet.merge_range(totals, sum, mcf1)
 			else
-				hours_worksheet.merge_range(team_names, team, title_format_2)
-				hours_worksheet.merge_range(totals, sum, cell_format_2)
+				worksheet.merge_range(team_names, team, tf2)
+				worksheet.merge_range(totals, sum, mcf2)
 			end
 
 			team_start = row
@@ -135,16 +252,16 @@ def write_to_excel(users)
 		end
 
 		if alternate_count == true
-			hours_worksheet.write(row-1, 1, user.name, cell_format_1) 
-			hours_worksheet.write_number(row-1, 2, user.hours_total, merged_cell_format_1)
+			worksheet.write_string(row-1, 1, user.name, cf1) 
+			worksheet.write_number(row-1, 2, select_user_variable(user, user_case), cf1)
 		else
-			hours_worksheet.write(row-1, 1, user.name, cell_format_2)
-			hours_worksheet.write_number(row-1, 2, user.hours_total, merged_cell_format_2)
+			worksheet.write_string(row-1, 1, user.name, cf2)
+			worksheet.write_number(row-1, 2, select_user_variable(user, user_case), cf2)
 		end
 
 		team = user.team
 		row += 1
-		sum += user.hours_total if !user.hours_total.nil?
+		sum += select_user_variable(user, user_case) if !select_user_variable(user, user_case).nil?
 	end
 
 	#processing for last team
@@ -152,26 +269,15 @@ def write_to_excel(users)
 	totals = "D#{team_start}:D#{row-1}, #{sum}"
 			
 	if alternate_count == true
-		hours_worksheet.merge_range(team_names, team, title_format_1)
-		hours_worksheet.merge_range(totals, sum, cell_format_1)
+		worksheet.merge_range(team_names, team, tf1)
+		worksheet.merge_range(totals, sum, mcf1)
 	else
-		hours_worksheet.merge_range(team_names, team, title_format_2)
-		hours_worksheet.merge_range(totals, sum, cell_format_2)
+		worksheet.merge_range(team_names, team, tf2)
+		worksheet.merge_range(totals, sum, mcf2)
 	end
-
-	workbook.close
+	
 end
 
-####################################
-# Writes column headers to excel doc
-####################################
-def write_headers_to_excel(workbook, worksheet, users, title, title2)
-	column_format = workbook.add_format(:valign  => 'vcenter', :align   => 'center', :bg_color => 'green')
-	worksheet.write(0,0, "Team", column_format)
-	worksheet.write(0,1, "Owner", column_format)
-	worksheet.write(0,2, title, column_format)
-	worksheet.write(0,3, title2, column_format)
-end
 
 ###############
 # Main Function
@@ -179,20 +285,60 @@ end
 def run_forrest_run
 
 	#Change these dates
-	start_date = Date.new(2016,01,01)
-	end_date = Date.new(2016,01,31)
+	start_date = Date.new(2016,03,01)
+	end_date = Date.new(2016,03,31)
 
-	#read in data
-	users_csv = 'C:\Users\A5NB3ZZ\Dropbox\KPICSV\userList.csv'
-	cases_csv = 'C:\Users\A5NB3ZZ\Dropbox\KPICSV\CogentCase.csv'
-	tasks_csv = 'C:\Users\A5NB3ZZ\Dropbox\KPICSV\CaseTask_Hours2.csv'
+	#set csv paths
+	users_csv = 'C:\Users\A5NB3ZZ\Documents\Projects\2016\4 - April\KPI\Ruby\userList.txt'
+	cases_csv = 'C:\Users\A5NB3ZZ\Documents\Projects\2016\4 - April\KPI\Ruby\Cases.csv'
+	tasks_csv = 'C:\Users\A5NB3ZZ\Documents\Projects\2016\4 - April\KPI\Ruby\Tasks.csv'
+	correspondence_csv = 'C:\Users\A5NB3ZZ\Documents\Projects\2016\4 - April\KPI\Ruby\Correspondence.csv'
 
 	#read in data from CSV into array users of User class
-	users = read_data(users_csv, cases_csv, tasks_csv)
+	users = read_data(users_csv, cases_csv, tasks_csv, correspondence_csv, start_date, end_date)
+	
+	#sort users based on team
 	users.sort! {|x, y| x.team <=> y.team}
+
+	#generate stats for each user via the user class
 	users.each {|x| x.generate_statistics(start_date, end_date)}
 
-	write_to_excel(users)
+	users.each {|user| puts "#{user.closed_cases}"}
+
+	#change this for the output filename/path
+	workbook = WriteExcel.new('./test.xls')
+	tf1, tf2, cf1, cf2, mcf1, mcf2 = generate_styles(workbook)
+
+	###################
+	#Worksheet Creation
+	###################
+	hours_worksheet = workbook.add_worksheet('Hours')
+	hours_worksheet.set_column('B:B', 20)
+	write_headers_to_excel(workbook, hours_worksheet, users, "Hours Sum", "Hours Sum Per Team")
+	write_worksheet(hours_worksheet, users, 'hours', tf1, tf2, cf1, cf2, mcf1, mcf2)
+
+	open_worksheet = workbook.add_worksheet('Open_Cases')
+	open_worksheet.set_column('B:B', 20)
+	write_headers_to_excel(workbook, open_worksheet, users, "Open Sum", "Open Sum Per Team")
+	write_worksheet(open_worksheet, users, 'open', tf1, tf2, cf1, cf2, mcf1, mcf2)
+
+	created_worksheet = workbook.add_worksheet('Created_Cases')
+	created_worksheet.set_column('B:B', 20)
+	write_headers_to_excel(workbook, created_worksheet, users, "Created Sum", "Created Sum Per Team")
+	write_worksheet(created_worksheet, users, 'created', tf1, tf2, cf1, cf2, mcf1, mcf2)
+
+	closed_worksheet = workbook.add_worksheet('Closed_Cases')
+	closed_worksheet.set_column('B:B', 20)
+	write_headers_to_excel(workbook, closed_worksheet, users, "Closed Sum", "Closed Sum Per Team")
+	write_worksheet(closed_worksheet, users, 'closed', tf1, tf2, cf1, cf2, mcf1, mcf2)
+
+	inactive_worksheet = workbook.add_worksheet('Inactive')
+	inactive_worksheet.set_column('B:B', 20)
+	write_headers_to_excel(workbook, inactive_worksheet, users, "Inactive Sum", "Inactive Sum Per Team")
+	write_worksheet(inactive_worksheet, users, 'inactive', tf1, tf2, cf1, cf2, mcf1, mcf2)
+	
+
+	workbook.close
 end
 
 run_forrest_run()

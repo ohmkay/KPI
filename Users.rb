@@ -1,5 +1,7 @@
 class User
-	attr_accessor :user_id, :a_number, :name, :team, :cases, :tasks, :created_cases, :closed_cases, :open_cases, :hours_total
+	attr_accessor :user_id, :a_number, :name, :team, :cases, :tasks, 
+	:created_cases, :closed_cases, :open_cases, :hours_total, :inactive_cases
+
 
 	def initialize(user_id, a_number, name, team)
 		@user_id = user_id
@@ -8,24 +10,28 @@ class User
 		@team = team
 		@cases = []
 		@tasks = []
-		@created_cases = @closed_cases = @open_cases = @hours_total = 0
+		@created_cases = @closed_cases = @open_cases = 
+		@hours_total = @inactive_cases = 0
 	end
+
 
 	def add_cases(ticket)
 		cases.push(ticket)
 	end
 
+
 	def add_tasks(task)
 		tasks.push(task)
 	end
 
+
 	def generate_statistics(start_date, end_date)
 		cases.each do |ticket|
-			@created_cases += 1 if (ticket[:create_date].nil? && ticket[:create_date] >= start_date)
-			@closed_cases += 1 if !ticket[:close_date].nil? && (ticket[:close_date] <= end_date && ticket[:close_date] >= start_date)	
-			@open_cases += 1 if (ticket[:close_date].nil? || ticket[:close_date] <= end_date )
+			@created_cases += 1 if (!ticket[:create_date].nil? && (ticket[:create_date] >= start_date && ticket[:create_date] <= end_date))
+			@closed_cases += 1 if (!ticket[:close_date].nil? && (ticket[:close_date] <= end_date && ticket[:close_date] >= start_date))	
+			@open_cases += 1 if (ticket[:close_date].nil? || ticket[:close_date] <= end_date)
+			@inactive_cases += 1 if (ticket[:inactive] == true)
 		end
-
 
 		tasks.each do |task|
 			@hours_total += task[:hours] if (!task[:hours].nil? && !task[:complete_date].nil?) && 
@@ -33,11 +39,8 @@ class User
 		end
 	end
 
-	def format_worksheet(workboot, worksheet, title)
-
-	end
-
 end
 
-Struct.new("Case", :create_date, :close_date, :a_number)
+
+Struct.new("Case", :case_number, :create_date, :close_date, :a_number, :inactive)
 Struct.new("Task", :complete_date, :a_number, :hours)
