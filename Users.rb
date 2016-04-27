@@ -2,7 +2,6 @@ class User
 	attr_accessor :user_id, :a_number, :name, :team, :cases, :tasks, 
 	:created_cases, :closed_cases, :open_cases, :hours_total, :inactive_cases
 
-
 	def initialize(user_id, a_number, name, team)
 		@user_id = user_id
 		@a_number = a_number
@@ -14,7 +13,6 @@ class User
 		@hours_total = @inactive_cases = 0
 	end
 
-
 	def add_cases(ticket)
 		cases.push(ticket)
 	end
@@ -23,7 +21,6 @@ class User
 	def add_tasks(task)
 		tasks.push(task)
 	end
-
 
 	def generate_statistics(start_date, end_date)
 		cases.each do |ticket|

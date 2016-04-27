@@ -68,13 +68,13 @@ def read_data(users_csv_path, cases_csv_path, tasks_csv_path, correspondence_csv
 		
 		#add task to user's task list if anumber matches the user
 		users.select do |user|
-			user.add_tasks(Struct::Task.new(complete_date, a_number, hours)) if user.a_number == a_number
+			user.add_tasks(Struct::Task.new(complete_date, a_number, hours)) if (user.a_number == a_number) && (complete_date.nil? || (complete_date >= start_date && complete_date <= end_date))
 		end
 	end
 
 	#sort the correspondence by case number followed by entry date
 	puts "Sorting Correspondence..."
-	correspondence_csv.sort_by! { |x| [x[:caseno], x[:entrydate]] }
+	correspondence_csv.sort_by! { |x| [x[:caseno], x[:entrydate]]}
 
 	previous_case_number = nil
 	previous_entry_date = start_date
@@ -84,8 +84,6 @@ def read_data(users_csv_path, cases_csv_path, tasks_csv_path, correspondence_csv
 	correspondence_csv.each do |line|
 		case_number = line[:caseno]
 		entry_date = line[:entrydate]
-
-		entry_date = nil if entry_date.nil? || entry_date.empty?
 		entry_date = Date.strptime(entry_date, "%m/%d/%Y %H:%M") unless entry_date.nil?
 
 		#changes date check to start date if case changes
@@ -107,7 +105,7 @@ def read_data(users_csv_path, cases_csv_path, tasks_csv_path, correspondence_csv
 		end
 
 		#confirms if inactivity is in given date range
-		if (!entry_date.nil? && (entry_date >= start_date) && (entry_date <= end_date))
+		if ((entry_date >= start_date) && (entry_date <= end_date))
 			#checks if case number is the same as the previous case number
 			if ((case_number == previous_case_number) && !previous_case_number.nil?)
 				#checks if the dates are greater than 7 days apart
@@ -132,7 +130,6 @@ def read_data(users_csv_path, cases_csv_path, tasks_csv_path, correspondence_csv
 	return users
 end
 
-
 ####################################
 # Writes column headers to excel doc
 ####################################
@@ -147,7 +144,6 @@ def write_headers_to_excel(workbook, worksheet, users, title, title2)
 	worksheet.write(0,2, title, column_format)
 	worksheet.write(0,3, title2, column_format)
 end
-
 
 #######################################################
 # Generate worksheet styles for alternating team colors
@@ -302,8 +298,6 @@ def run_forrest_run
 
 	#generate stats for each user via the user class
 	users.each {|x| x.generate_statistics(start_date, end_date)}
-
-	users.each {|user| puts "#{user.closed_cases}"}
 
 	#change this for the output filename/path
 	workbook = WriteExcel.new('./test.xls')
