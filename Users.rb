@@ -17,7 +17,6 @@ class User
 		cases.push(ticket)
 	end
 
-
 	def add_tasks(task)
 		tasks.push(task)
 	end
@@ -26,7 +25,7 @@ class User
 		cases.each do |ticket|
 			@created_cases += 1 if (!ticket[:create_date].nil? && (ticket[:create_date] >= start_date && ticket[:create_date] <= end_date))
 			@closed_cases += 1 if (!ticket[:close_date].nil? && (ticket[:close_date] <= end_date && ticket[:close_date] >= start_date))	
-			@open_cases += 1 if (ticket[:close_date].nil? || ticket[:close_date] <= end_date)
+			@open_cases += 1 if ticket[:close_date].nil? || (ticket[:close_date] >= end_date && ticket[:create_date] <= end_date)
 			@inactive_cases += 1 if (ticket[:inactive] == true)
 		end
 
@@ -39,5 +38,5 @@ class User
 end
 
 
-Struct.new("Case", :case_number, :create_date, :close_date, :a_number, :inactive)
+Struct.new("Case", :case_number, :create_date, :close_date, :a_number, :case_type, :inactive)
 Struct.new("Task", :complete_date, :a_number, :hours)

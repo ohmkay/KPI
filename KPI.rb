@@ -44,6 +44,10 @@ def read_data(users_csv_path, cases_csv_path, tasks_csv_path, correspondence_csv
 		create_date = line[:createdate]
 		close_date = line[:closedate]
 		a_number = line[:owner]
+		case_type = line[:casetype]
+
+		#only read in Support cases
+		next if case_type != 'Support'
 
 		create_date = nil if create_date.nil? || create_date.empty?
 		create_date = Date.strptime(create_date, "%m/%d/%Y %H:%M:%S") unless create_date.nil?
@@ -52,7 +56,7 @@ def read_data(users_csv_path, cases_csv_path, tasks_csv_path, correspondence_csv
 
 		#add case to user's case list if anumber matches the user
 		users.select do |user|
-			user.add_cases(Struct::Case.new(case_number, create_date, close_date, a_number)) if user.a_number == a_number
+			user.add_cases(Struct::Case.new(case_number, create_date, close_date, a_number, case_type)) if user.a_number == a_number
 		end
 	end
 
@@ -68,7 +72,7 @@ def read_data(users_csv_path, cases_csv_path, tasks_csv_path, correspondence_csv
 		
 		#add task to user's task list if anumber matches the user
 		users.select do |user|
-			user.add_tasks(Struct::Task.new(complete_date, a_number, hours)) if (user.a_number == a_number) && (complete_date.nil? || (complete_date >= start_date && complete_date <= end_date))
+			user.add_tasks(Struct::Task.new(complete_date, a_number, hours)) if user.a_number == a_number && complete_date.nil? || (complete_date >= start_date && complete_date <= end_date)
 		end
 	end
 
@@ -95,7 +99,7 @@ def read_data(users_csv_path, cases_csv_path, tasks_csv_path, correspondence_csv
 					user.cases.select do |ticket|
 						if previous_case_number == ticket.case_number
 							ticket.inactive = true
-							puts "YES #2 #{ticket.case_number} - #{end_date} - #{previous_entry_date}"
+							#puts "YES #2 #{ticket.case_number} - #{end_date} - #{previous_entry_date}"
 						end
 					end
 				end
@@ -115,7 +119,7 @@ def read_data(users_csv_path, cases_csv_path, tasks_csv_path, correspondence_csv
 						user.cases.select do |ticket|
 							if (case_number == ticket.case_number)
 								ticket.inactive = true 
-								puts "YES #{ticket.case_number} - #{entry_date} - #{previous_entry_date}"
+								#puts "YES #{ticket.case_number} - #{entry_date} - #{previous_entry_date}"
 							end
 						end
 					end
@@ -285,13 +289,23 @@ def run_forrest_run
 	end_date = Date.new(2016,03,31)
 
 	#set csv paths
-	users_csv = 'C:\Users\A5NB3ZZ\Documents\Projects\2016\4 - April\KPI\Ruby\userList.txt'
-	cases_csv = 'C:\Users\A5NB3ZZ\Documents\Projects\2016\4 - April\KPI\Ruby\Cases.csv'
-	tasks_csv = 'C:\Users\A5NB3ZZ\Documents\Projects\2016\4 - April\KPI\Ruby\Tasks.csv'
-	correspondence_csv = 'C:\Users\A5NB3ZZ\Documents\Projects\2016\4 - April\KPI\Ruby\Correspondence.csv'
+	users_csv = 'C:\Users\caleb\Documents\Ruby\newKPIMarch\userList.csv'
+	cases_csv = 'C:\Users\caleb\Documents\Ruby\newKPIMarch\Cases.csv'
+	tasks_csv = 'C:\Users\caleb\Documents\Ruby\newKPIMarch\Tasks.csv'
+	correspondence_csv = 'C:\Users\caleb\Documents\Ruby\newKPIMarch\Correspondence.csv'
 
 	#read in data from CSV into array users of User class
 	users = read_data(users_csv, cases_csv, tasks_csv, correspondence_csv, start_date, end_date)
+
+	#TESTING
+	#users.select do |user|
+	#	if user.a_number == 'USAC\\A5NB3ZZ'
+	#		user.cases.each do |ticket|
+	#			#puts "#{ticket[:close_date]} ----  #{end_date}"
+	#			puts "#{ticket.a_number} - #{ticket.case_number} - #{ticket.create_date} - #{ticket.close_date} - #{ticket.case_type}" if (!ticket[:close_date].nil? && (ticket[:close_date] <= end_date && ticket[:close_date] >= start_date))	
+	#		end
+	#	end
+	#end
 	
 	#sort users based on team
 	users.sort! {|x, y| x.team <=> y.team}
@@ -300,8 +314,9 @@ def run_forrest_run
 	users.each {|x| x.generate_statistics(start_date, end_date)}
 
 	#change this for the output filename/path
-	workbook = WriteExcel.new('./test.xls')
+	workbook = WriteExcel.new('C:\Users\caleb\Documents\Ruby\newKPIMarch\output.xls')
 	tf1, tf2, cf1, cf2, mcf1, mcf2 = generate_styles(workbook)
+
 
 	###################
 	#Worksheet Creation
