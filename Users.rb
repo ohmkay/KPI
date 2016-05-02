@@ -38,5 +38,5 @@ class User
 end
 
 
-Struct.new("Case", :case_number, :create_date, :close_date, :a_number, :case_type, :inactive)
+Struct.new("Case", :case_number, :create_date, :close_date, :a_number, :case_type, :days_open, :inactive)
 Struct.new("Task", :complete_date, :a_number, :hours)

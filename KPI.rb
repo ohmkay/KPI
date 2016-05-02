@@ -54,9 +54,11 @@ def read_data(users_csv_path, cases_csv_path, tasks_csv_path, correspondence_csv
 		close_date = nil if close_date.nil? || close_date.empty?
 		close_date = Date.strptime(close_date, "%m/%d/%Y %H:%M:%S") unless close_date.nil?
 
+		days_open = (close_date - create_date).to_i if !create_date.nil? && !close_date.nil? && status == -1
+		puts "#{case_number} - #{days_open}"
 		#add case to user's case list if anumber matches the user
 		users.select do |user|
-			user.add_cases(Struct::Case.new(case_number, create_date, close_date, a_number, case_type)) if user.a_number == a_number
+			user.add_cases(Struct::Case.new(case_number, create_date, close_date, a_number, case_type, days_open)) if user.a_number == a_number
 		end
 	end
 
@@ -72,7 +74,7 @@ def read_data(users_csv_path, cases_csv_path, tasks_csv_path, correspondence_csv
 		
 		#add task to user's task list if anumber matches the user
 		users.select do |user|
-			user.add_tasks(Struct::Task.new(complete_date, a_number, hours)) if user.a_number == a_number && complete_date.nil? || (complete_date >= start_date && complete_date <= end_date)
+			user.add_tasks(Struct::Task.new(complete_date, a_number, hours)) if user.a_number == a_number && (complete_date.nil? || (complete_date >= start_date && complete_date <= end_date))
 		end
 	end
 
@@ -221,9 +223,9 @@ def select_user_variable(user, user_case)
 end 
 
 
-#####################
-# Generate Statistics
-#####################
+##########################
+# Write General Statistics
+##########################
  def write_worksheet(worksheet, users, user_case, tf1, tf2, cf1, cf2, mcf1, mcf2)
 	
 	row, sum = 2, 0
@@ -289,10 +291,10 @@ def run_forrest_run
 	end_date = Date.new(2016,03,31)
 
 	#set csv paths
-	users_csv = 'C:\Users\caleb\Documents\Ruby\newKPIMarch\userList.csv'
-	cases_csv = 'C:\Users\caleb\Documents\Ruby\newKPIMarch\Cases.csv'
-	tasks_csv = 'C:\Users\caleb\Documents\Ruby\newKPIMarch\Tasks.csv'
-	correspondence_csv = 'C:\Users\caleb\Documents\Ruby\newKPIMarch\Correspondence.csv'
+	users_csv = 'C:\Users\caleb\OneDrive\Documents\Programming\Ruby\newKPIMarch\userList.csv'
+	cases_csv = 'C:\Users\caleb\OneDrive\Documents\Programming\Ruby\newKPIMarch\Cases.csv'
+	tasks_csv = 'C:\Users\caleb\OneDrive\Documents\Programming\Ruby\newKPIMarch\Tasks.csv'
+	correspondence_csv = 'C:\Users\caleb\OneDrive\Documents\Programming\Ruby\newKPIMarch\Correspondence.csv'
 
 	#read in data from CSV into array users of User class
 	users = read_data(users_csv, cases_csv, tasks_csv, correspondence_csv, start_date, end_date)
@@ -314,7 +316,7 @@ def run_forrest_run
 	users.each {|x| x.generate_statistics(start_date, end_date)}
 
 	#change this for the output filename/path
-	workbook = WriteExcel.new('C:\Users\caleb\Documents\Ruby\newKPIMarch\output.xls')
+	workbook = WriteExcel.new('C:\Users\caleb\OneDrive\Documents\Programming\Ruby\newKPIMarch\output.xls')
 	tf1, tf2, cf1, cf2, mcf1, mcf2 = generate_styles(workbook)
 
 
