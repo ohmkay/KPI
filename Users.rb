@@ -23,7 +23,6 @@ class User
 
 	def generate_statistics(start_date, end_date)
 		cases.each do |ticket|
-			@created_cases += 1 if (!ticket[:create_date].nil? && (ticket[:create_date] >= start_date && ticket[:create_date] <= end_date))
 			@closed_cases += 1 if (!ticket[:close_date].nil? && (ticket[:close_date] <= end_date && ticket[:close_date] >= start_date))	
 			@open_cases += 1 if ticket[:close_date].nil? || (ticket[:close_date] >= end_date && ticket[:create_date] <= end_date)
 			@inactive_cases += 1 if (ticket[:inactive] == true)
@@ -38,5 +37,5 @@ class User
 end
 
 
-Struct.new("Case", :case_number, :create_date, :close_date, :a_number, :case_type, :days_open, :inactive)
+Struct.new("Case", :case_number, :create_date, :close_date, :a_number, :case_type, :days_open, :status, :creator, :inactive)
 Struct.new("Task", :complete_date, :a_number, :hours)
