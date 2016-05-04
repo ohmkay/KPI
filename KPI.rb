@@ -55,12 +55,16 @@ def read_data(users_csv_path, cases_csv_path, tasks_csv_path, correspondence_csv
 		close_date = nil if close_date.nil? || close_date.empty?
 		close_date = Date.strptime(close_date, "%m/%d/%Y %H:%M:%S") unless close_date.nil?
 
-		days_open = (close_date - create_date).to_i if !create_date.nil? && !close_date.nil? && status == -1
+		if !create_date.nil? && !close_date.nil? && status == -1
+			days_open = (close_date - create_date).to_i
+		elsif create_date <= end_date
+			days_open = (end_date - create_date).to_i
+		end
 
 		users.select do |user|
 			user.add_cases(Struct::Case.new(case_number, create_date, close_date, a_number, case_type, status, creator, days_open)) if user.a_number == a_number
 			#add 1 to created cases if creator exists in ticket
-			user.created_cases += 1 if ((creator == user.a_number) && (!create_date.nil? && create_date >= start_date && create_date <= end_date))
+			user.created_cases += 1 if ((a_number == user.a_number) && (!create_date.nil? && create_date >= start_date && create_date <= end_date))
 		end
 	end
 
@@ -70,13 +74,16 @@ def read_data(users_csv_path, cases_csv_path, tasks_csv_path, correspondence_csv
 		complete_date = line[:completedate]
 		a_number = line[:taskowner]
 		hours = line[:actualhours].to_f
+		case_number = line[:caseno]
 
 		complete_date = nil if complete_date.nil? || complete_date.empty?
 		complete_date = Date.strptime(complete_date, "%m/%d/%Y %H:%M:%S") unless complete_date.nil?
+
+		puts "#{a_number} - #{case_number} - #{hours} - #{complete_date}" if (hours > 20) && (!complete_date.nil? && (complete_date >= start_date && complete_date <= end_date))
 		
 		#add task to user's task list if anumber matches the user
 		users.select do |user|
-			user.add_tasks(Struct::Task.new(complete_date, a_number, hours)) if user.a_number == a_number && (complete_date.nil? || (complete_date >= start_date && complete_date <= end_date))
+			user.add_tasks(Struct::Task.new(complete_date, a_number, hours)) if user.a_number == a_number && (!complete_date.nil? && (complete_date >= start_date && complete_date <= end_date))
 		end
 	end
 
@@ -106,10 +113,6 @@ def read_data(users_csv_path, cases_csv_path, tasks_csv_path, correspondence_csv
 							#before marking inactive, checks to make sure ticket isn't a closed ticket
 							if ticket.close_date.nil? && ticket.status != -1
 								ticket.inactive = true
-								#puts "YES #2 #{ticket.case_number} - #{end_date} - #{previous_entry_date}"
-								if user.a_number == 'USAC\\A6689ZZ'
-									puts "LAST CORR - #{ticket.case_number} - #{end_date} - #{previous_entry_date}"
-								end
 							end
 						end
 					end
@@ -129,13 +132,7 @@ def read_data(users_csv_path, cases_csv_path, tasks_csv_path, correspondence_csv
 					users.select do |user|
 						user.cases.select do |ticket|
 							if (case_number == ticket.case_number)
-								#before marking inactive, checks to make sure ticket isn't a closed ticket
-								#if ticket.close_date.nil? && ticket.status != -1
-									ticket.inactive = true 
-									if user.a_number == 'USAC\\A6689ZZ'
-										puts "CORR - #{ticket.case_number} - #{entry_date} - #{previous_entry_date}"
-									end
-								#end
+								ticket.inactive = true 
 							end
 						end
 					end
@@ -153,7 +150,7 @@ end
 ####################################
 # Writes column headers to excel doc
 ####################################
-def write_headers_to_excel(workbook, worksheet, users, title, title2)
+def write_headers_to_excel(workbook, worksheet, users, title, title2, average)
 	column_format = workbook.add_format(
 		:valign  => 'vcenter', 
 		:align   => 'center', 
@@ -161,8 +158,14 @@ def write_headers_to_excel(workbook, worksheet, users, title, title2)
 		:bold => 1)
 	worksheet.write(0,0, "Team", column_format)
 	worksheet.write(0,1, "Owner", column_format)
-	worksheet.write(0,2, title, column_format)
-	worksheet.write(0,3, title2, column_format)
+	if average == true
+		worksheet.write(0,2, "Average_Open", column_format)
+		worksheet.write(0,3, title, column_format)
+		worksheet.write(0,4, title2, column_format)
+	else
+		worksheet.write(0,2, title, column_format)
+		worksheet.write(0,3, title2, column_format)
+	end
 end
 
 #######################################################
@@ -233,6 +236,8 @@ def select_user_variable(user, user_case)
 		user.closed_cases
 	when 'inactive'
 		user.inactive_cases
+	when 'open_more_than_10'
+		user.open_more_than_10
 	end
 end 
 
@@ -240,7 +245,7 @@ end
 ##########################
 # Write General Statistics
 ##########################
- def write_worksheet(worksheet, users, user_case, tf1, tf2, cf1, cf2, mcf1, mcf2)
+ def write_worksheet(worksheet, users, user_case, calculate_avg, avg_type, tf1, tf2, cf1, cf2, mcf1, mcf2)
 	
 	row, sum = 2, 0
 	team = users[0].team
@@ -251,8 +256,13 @@ end
 	users.each do |user|
 
 		if team != user.team
-			team_names = "A#{team_start}:A#{row-1}, #{team}"
-			totals = "D#{team_start}:D#{row-1}, #{sum}"
+			if calculate_avg == false
+				team_names = "A#{team_start}:A#{row-1}, #{team}"
+				totals = "D#{team_start}:D#{row-1}, #{sum}"
+			else
+				team_names = "A#{team_start}:A#{row-1}, #{team}"
+				totals = "E#{team_start}:E#{row-1}, #{sum}"
+			end
 
 			if alternate_count == true
 				worksheet.merge_range(team_names, team, tf1)
@@ -268,11 +278,35 @@ end
 		end
 
 		if alternate_count == true
-			worksheet.write_string(row-1, 1, user.name, cf1) 
-			worksheet.write_number(row-1, 2, select_user_variable(user, user_case), cf1)
+			if calculate_avg == false
+				worksheet.write_string(row-1, 1, user.name, cf1) 
+				worksheet.write_number(row-1, 2, select_user_variable(user, user_case), cf1)
+			else
+				worksheet.write_string(row-1, 1, user.name, cf1) 
+
+				if avg_type == 'closed'
+					worksheet.write_number(row-1, 2, user.avg_closed[:average], cf1)
+				elsif avg_type == 'open'
+					worksheet.write_number(row-1, 2, user.avg_open[:average], cf1)
+				end
+
+				worksheet.write_number(row-1, 3, select_user_variable(user, user_case), cf1)
+			end
 		else
-			worksheet.write_string(row-1, 1, user.name, cf2)
-			worksheet.write_number(row-1, 2, select_user_variable(user, user_case), cf2)
+			if calculate_avg == false
+				worksheet.write_string(row-1, 1, user.name, cf2)
+				worksheet.write_number(row-1, 2, select_user_variable(user, user_case), cf2)
+			else
+				worksheet.write_string(row-1, 1, user.name, cf2)
+
+				if avg_type == 'closed'
+					worksheet.write_number(row-1, 2, user.avg_closed[:average], cf2)
+				elsif avg_type == 'open'
+					worksheet.write_number(row-1, 2, user.avg_open[:average], cf2)
+				end
+
+				worksheet.write_number(row-1, 3, select_user_variable(user, user_case), cf2)
+			end
 		end
 
 		team = user.team
@@ -281,8 +315,13 @@ end
 	end
 
 	#processing for last team
-	team_names = "A#{team_start}:A#{row-1}, #{team}"
-	totals = "D#{team_start}:D#{row-1}, #{sum}"
+	if calculate_avg == false
+		team_names = "A#{team_start}:A#{row-1}, #{team}"
+		totals = "D#{team_start}:D#{row-1}, #{sum}"
+	else
+		team_names = "A#{team_start}:A#{row-1}, #{team}"
+		totals = "E#{team_start}:E#{row-1}, #{sum}"
+	end
 			
 	if alternate_count == true
 		worksheet.merge_range(team_names, team, tf1)
@@ -294,6 +333,45 @@ end
 	
 end
 
+def calculate_totals(worksheet, workbook, users)
+	column_format_totals = workbook.add_format(
+		:valign  => 'vcenter', 
+		:align   => 'center', 
+		:bg_color => 'gray', 
+		:bold => 1)
+	worksheet.write(0,0, "Created Cases", column_format_totals)
+	worksheet.write(0,1, "Closed Cases", column_format_totals)
+	worksheet.write(0,2, "Open Cases", column_format_totals)
+	worksheet.write(0,3, "Hours", column_format_totals)
+	worksheet.write(0,4, "Average Closed Cases", column_format_totals)
+	worksheet.write(0,5, "Average Open Cases", column_format_totals)
+
+	created_total = closed_total = open_total = hours_total = 0
+	avg_closed_count = avg_open_count = avg_closed_days_total = avg_open_days_total = 0
+
+	users.each do |user|
+		 created_total += user.created_cases
+		 closed_total += user.closed_cases
+		 open_total += user.open_cases
+		 hours_total += user.hours_total
+
+		 avg_closed_count += user.avg_closed[:count]
+		 avg_closed_days_total += user.avg_closed[:days_total]
+
+		 avg_open_count += user.avg_open[:count]
+		 avg_open_days_total += user.avg_open[:days_total]
+	end	
+
+	puts "#{avg_closed_days_total} - #{avg_closed_count}"
+	puts "#{avg_open_days_total} - #{avg_open_count}"
+
+	worksheet.write(1,0,created_total)
+	worksheet.write(1,1,closed_total)
+	worksheet.write(1,2,open_total)
+	worksheet.write(1,3,hours_total)
+	worksheet.write(1,4,(avg_closed_days_total/avg_closed_count))
+	worksheet.write(1,5,(avg_open_days_total/avg_open_count))
+end
 
 ###############
 # Main Function
@@ -312,18 +390,6 @@ def run_forrest_run
 
 	#read in data from CSV into array users of User class
 	users = read_data(users_csv, cases_csv, tasks_csv, correspondence_csv, start_date, end_date)
-
-	#puts "#{users.size}"
-
-	#TESTING
-	#users.select do |user|
-	#	if user.a_number == 'USAC\\A6689ZZ'
-	#		user.cases.each do |ticket|
-	#			#puts "#{ticket[:close_date]} ----  #{end_date}"
-	#			puts "#{ticket.a_number} - #{ticket.case_number} - #{ticket.create_date} - #{ticket.close_date} - #{ticket.case_type}" if (!ticket[:close_date].nil? && (ticket[:close_date] <= end_date && ticket[:close_date] >= start_date))	
-	#		end
-	#	
-	#end
 	
 	#sort users based on team
 	users.sort! {|x, y| x.team <=> y.team}
@@ -335,35 +401,48 @@ def run_forrest_run
 	workbook = WriteExcel.new('C:\Users\A5NB3ZZ\Documents\Projects\2016\5 - May\KPI\output.xls')
 	tf1, tf2, cf1, cf2, mcf1, mcf2 = generate_styles(workbook)
 
+	users.each do |user|
+		user.cases.each do |ticket|
+			puts "#{ticket.case_number} - #{ticket.days_open}"
+		end
+	end
 
 	###################
 	#Worksheet Creation
 	###################
+	monthly_totals = workbook.add_worksheet('Monthly Summary')
+	monthly_totals.set_column('A:F', 20)
+	calculate_totals(monthly_totals, workbook, users)
+
 	hours_worksheet = workbook.add_worksheet('Hours')
-	hours_worksheet.set_column('B:B', 20)
-	write_headers_to_excel(workbook, hours_worksheet, users, "Hours Sum", "Hours Sum Per Team")
-	write_worksheet(hours_worksheet, users, 'hours', tf1, tf2, cf1, cf2, mcf1, mcf2)
+	hours_worksheet.set_column('A:D', 20)
+	write_headers_to_excel(workbook, hours_worksheet, users, "Hours Sum", "Hours Sum Per Team", false)
+	write_worksheet(hours_worksheet, users, 'hours', false, 'none', tf1, tf2, cf1, cf2, mcf1, mcf2)
 
-	open_worksheet = workbook.add_worksheet('Open_Cases')
-	open_worksheet.set_column('B:B', 20)
-	write_headers_to_excel(workbook, open_worksheet, users, "Open Sum", "Open Sum Per Team")
-	write_worksheet(open_worksheet, users, 'open', tf1, tf2, cf1, cf2, mcf1, mcf2)
+	open_worksheet = workbook.add_worksheet('Open')
+	open_worksheet.set_column('A:E', 20)
+	write_headers_to_excel(workbook, open_worksheet, users, "Open Sum", "Open Sum Per Team", true)
+	write_worksheet(open_worksheet, users, 'open', true, 'open', tf1, tf2, cf1, cf2, mcf1, mcf2)
 
-	created_worksheet = workbook.add_worksheet('Created_Cases')
-	created_worksheet.set_column('B:B', 20)
-	write_headers_to_excel(workbook, created_worksheet, users, "Created Sum", "Created Sum Per Team")
-	write_worksheet(created_worksheet, users, 'created', tf1, tf2, cf1, cf2, mcf1, mcf2)
+	created_worksheet = workbook.add_worksheet('Created')
+	created_worksheet.set_column('A:D', 20)
+	write_headers_to_excel(workbook, created_worksheet, users, "Created Sum", "Created Sum Per Team", false)
+	write_worksheet(created_worksheet, users, 'created', false, 'none', tf1, tf2, cf1, cf2, mcf1, mcf2)
 
-	closed_worksheet = workbook.add_worksheet('Closed_Cases')
-	closed_worksheet.set_column('B:B', 20)
-	write_headers_to_excel(workbook, closed_worksheet, users, "Closed Sum", "Closed Sum Per Team")
-	write_worksheet(closed_worksheet, users, 'closed', tf1, tf2, cf1, cf2, mcf1, mcf2)
+	closed_worksheet = workbook.add_worksheet('Closed')
+	closed_worksheet.set_column('A:E', 20)
+	write_headers_to_excel(workbook, closed_worksheet, users, "Closed Sum", "Closed Sum Per Team", true)
+	write_worksheet(closed_worksheet, users, 'closed', true, 'closed', tf1, tf2, cf1, cf2, mcf1, mcf2)
 
 	inactive_worksheet = workbook.add_worksheet('Inactive')
-	inactive_worksheet.set_column('B:B', 20)
-	write_headers_to_excel(workbook, inactive_worksheet, users, "Inactive Sum", "Inactive Sum Per Team")
-	write_worksheet(inactive_worksheet, users, 'inactive', tf1, tf2, cf1, cf2, mcf1, mcf2)
-	
+	inactive_worksheet.set_column('A:D', 20)
+	write_headers_to_excel(workbook, inactive_worksheet, users, "Inactive Sum", "Inactive Sum Per Team", false)
+	write_worksheet(inactive_worksheet, users, 'inactive', false, 'none', tf1, tf2, cf1, cf2, mcf1, mcf2)
+
+	open_more_than_10 = workbook.add_worksheet('OpenMoreThan10')
+	open_more_than_10.set_column('A:D', 20)
+	write_headers_to_excel(workbook, open_more_than_10, users, "Open > 10 Sum", "Sum Per Team", false)
+	write_worksheet(open_more_than_10, users, 'open_more_than_10', false, 'none', tf1, tf2, cf1, cf2, mcf1, mcf2)
 
 	workbook.close
 end
