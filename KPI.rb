@@ -15,7 +15,7 @@ def read_data(users_csv_path, cases_csv_path, tasks_csv_path, correspondence_csv
 
 	#read string as path
 	puts "Reading CSV data..." 
-	users_csv = CSV.read(users_csv_path, {encoding: "UTF-8", headers: true, header_converters: :symbol, converters: :all})
+	users_csv = CSV.read(users_csv_path, {encoding: "UTF-8", headers: true, skip_blanks: true, header_converters: :symbol, converters: :all})
 	cases_csv = CSV.read(cases_csv_path, {encoding: "UTF-8", headers: true, header_converters: :symbol, converters: :all})
 	tasks_csv = CSV.read(tasks_csv_path, {encoding: "UTF-8", headers: true, header_converters: :symbol, converters: :all})
 
@@ -55,7 +55,7 @@ def read_data(users_csv_path, cases_csv_path, tasks_csv_path, correspondence_csv
 		close_date = nil if close_date.nil? || close_date.empty?
 		close_date = Date.strptime(close_date, "%m/%d/%Y %H:%M:%S") unless close_date.nil?
 
-		if !create_date.nil? && !close_date.nil? && status == -1
+		if !create_date.nil? && !close_date.nil? && status == -1 && close_date < end_date
 			days_open = (close_date - create_date).to_i
 		elsif create_date <= end_date
 			days_open = (end_date - create_date).to_i
@@ -79,7 +79,7 @@ def read_data(users_csv_path, cases_csv_path, tasks_csv_path, correspondence_csv
 		complete_date = nil if complete_date.nil? || complete_date.empty?
 		complete_date = Date.strptime(complete_date, "%m/%d/%Y %H:%M:%S") unless complete_date.nil?
 
-		puts "#{a_number} - #{case_number} - #{hours} - #{complete_date}" if (hours > 20) && (!complete_date.nil? && (complete_date >= start_date && complete_date <= end_date))
+		#puts "#{a_number} - #{case_number} - #{hours} - #{complete_date}" if (hours > 20) && (!complete_date.nil? && (complete_date >= start_date && complete_date <= end_date))
 		
 		#add task to user's task list if anumber matches the user
 		users.select do |user|
@@ -91,16 +91,16 @@ def read_data(users_csv_path, cases_csv_path, tasks_csv_path, correspondence_csv
 	puts "Sorting Correspondence..."
 	correspondence_csv.sort_by! { |x| [x[:caseno], x[:entrydate]]}
 
+	#correspondence list processing
+	puts "Processing Correspondence..."
+	inactive_days_count = 7
 	previous_case_number = nil
 	previous_entry_date = start_date
 
-	#correspondence list processing
-	puts "Processing Correspondence..."
 	correspondence_csv.each do |line|
 		case_number = line[:caseno]
 		entry_date = line[:entrydate]
 		entry_date = Date.strptime(entry_date, "%m/%d/%Y %H:%M") unless entry_date.nil?
-		inactive_days_count = 7
 
 		#changes date check to start date if case changes
 		if previous_case_number != case_number
@@ -133,6 +133,7 @@ def read_data(users_csv_path, cases_csv_path, tasks_csv_path, correspondence_csv
 						user.cases.select do |ticket|
 							if (case_number == ticket.case_number)
 								ticket.inactive = true 
+								#puts "#{ticket.a_number} - #{ticket.case_number}"
 							end
 						end
 					end
@@ -362,9 +363,6 @@ def calculate_totals(worksheet, workbook, users)
 		 avg_open_days_total += user.avg_open[:days_total]
 	end	
 
-	puts "#{avg_closed_days_total} - #{avg_closed_count}"
-	puts "#{avg_open_days_total} - #{avg_open_count}"
-
 	worksheet.write(1,0,created_total)
 	worksheet.write(1,1,closed_total)
 	worksheet.write(1,2,open_total)
@@ -379,8 +377,8 @@ end
 def run_forrest_run
 
 	#Change these dates
-	start_date = Date.new(2016,04,01)
-	end_date = Date.new(2016,04,30)
+	start_date = Date.new(2016,03,01)
+	end_date = Date.new(2016,03,31)
 
 	#set csv paths
 	users_csv = 'C:\Users\A5NB3ZZ\Documents\Projects\2016\5 - May\KPI\userList.txt'
@@ -398,14 +396,14 @@ def run_forrest_run
 	users.each {|x| x.generate_statistics(start_date, end_date)}
 
 	#change this for the output filename/path
-	workbook = WriteExcel.new('C:\Users\A5NB3ZZ\Documents\Projects\2016\5 - May\KPI\output.xls')
+	workbook = WriteExcel.new('C:\Users\A5NB3ZZ\Documents\Projects\2016\5 - May\KPI\test.xls')
 	tf1, tf2, cf1, cf2, mcf1, mcf2 = generate_styles(workbook)
 
-	users.each do |user|
-		user.cases.each do |ticket|
-			puts "#{ticket.case_number} - #{ticket.days_open}"
-		end
-	end
+	#users.each do |user|
+	#	user.cases.each do |ticket|
+	#		puts "#{ticket.case_number} - #{ticket.days_open}"
+	#	end
+	#end
 
 	###################
 	#Worksheet Creation

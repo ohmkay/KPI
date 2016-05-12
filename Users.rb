@@ -31,13 +31,14 @@ class User
 				@avg_closed[:count] += 1
 			end
 
-			if ticket[:close_date].nil? || (ticket[:close_date] >= end_date && ticket[:create_date] <= end_date)
+			if (ticket[:close_date].nil? || ticket[:close_date] > end_date) && (ticket[:create_date] <= end_date)
 				@open_cases += 1 
 				@avg_open[:days_total] += ticket.days_open if !ticket.days_open.nil?
 				@avg_open[:count] += 1
+				#puts "#{ticket[:case_number]} - #{ticket[:create_date]} - #{ticket[:close_date]} - #{ticket[:days_open]}" if ticket[:a_number] == "USAC\\A5NB3ZZ"
 			end
 			
-			@open_more_than_10 += 1 if ticket[:close_date].nil? && (ticket[:create_date] + 10) < end_date
+			@open_more_than_10 += 1 if (ticket[:close_date].nil? || ticket[:close_date] > end_date) && ((ticket[:create_date] + 10) < end_date)
 			@inactive_cases += 1 if (ticket[:inactive] == true)
 		end
 		@avg_closed[:average] = @avg_closed[:days_total] / @avg_closed[:count] if @avg_closed[:count] != 0
@@ -53,4 +54,5 @@ end
 
 
 Struct.new("Case", :case_number, :create_date, :close_date, :a_number, :case_type, :status, :creator, :days_open, :inactive)
+
 Struct.new("Task", :complete_date, :a_number, :hours)
