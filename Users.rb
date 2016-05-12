@@ -1,3 +1,5 @@
+require_relative ('Case')
+
 class User
 	attr_accessor :user_id, :a_number, :name, :team, :cases, :tasks, 
 	:created_cases, :closed_cases, :open_cases, :hours_total, :inactive_cases, :open_more_than_10, :avg_open, :avg_closed
@@ -23,27 +25,34 @@ class User
 		tasks.push(task)
 	end
 
-	def generate_statistics(start_date, end_date)
+	def generate_user_statistics(start_date, end_date, days_inactive)
 		cases.each do |ticket|
-			if (!ticket[:close_date].nil? && (ticket[:close_date] <= end_date && ticket[:close_date] >= start_date))
-				@closed_cases += 1 
-				@avg_closed[:days_total] += ticket.days_open
-				@avg_closed[:count] += 1
-			end
+			#generate ticket level statistics via the Case class
+			ticket.generate_case_statistics(start_date, end_date, days_inactive)
 
-			if (ticket[:close_date].nil? || ticket[:close_date] > end_date) && (ticket[:create_date] <= end_date)
-				@open_cases += 1 
-				@avg_open[:days_total] += ticket.days_open if !ticket.days_open.nil?
-				@avg_open[:count] += 1
-				#puts "#{ticket[:case_number]} - #{ticket[:create_date]} - #{ticket[:close_date]} - #{ticket[:days_open]}" if ticket[:a_number] == "USAC\\A5NB3ZZ"
-			end
-			
-			@open_more_than_10 += 1 if (ticket[:close_date].nil? || ticket[:close_date] > end_date) && ((ticket[:create_date] + 10) < end_date)
-			@inactive_cases += 1 if (ticket[:inactive] == true)
+				if ticket.closed_status == true
+					@closed_cases += 1
+					@avg_closed[:days_total] += ticket.days_open if !ticket.days_open.nil?
+					@avg_closed[:count] += 1
+				end
+
+				if ticket.open_status == true
+					@open_cases += 1
+					@avg_open[:days_total] += ticket.days_open if !ticket.days_open.nil?
+					@avg_open[:count] += 1
+				end
+
+				@created_cases += 1 if ticket.created_status == true
+				@inactive_cases += 1 if ticket.inactive_status == true
+				puts "#{@a_number} - #{ticket.case_number} - #{ticket.create_date} - #{ticket.close_date}" if ticket.inactive_status == true && @a_number == "USAC\\A6689ZZ"
+				@open_more_than_10 += 1 if ticket.openmorethan10_status == true
 		end
+
+		#calculating averages and average totals for open and closed tickets
 		@avg_closed[:average] = @avg_closed[:days_total] / @avg_closed[:count] if @avg_closed[:count] != 0
 		@avg_open[:average] = @avg_open[:days_total] / @avg_open[:count] if @avg_open[:count] != 0
 
+		#calculate hours based on tasks
 		tasks.each do |task|
 			@hours_total += task[:hours] if (!task[:hours].nil? && !task[:complete_date].nil?) && 
 			(task[:complete_date] <= end_date) && (task[:complete_date] >= start_date)
@@ -51,8 +60,5 @@ class User
 	end
 
 end
-
-
-Struct.new("Case", :case_number, :create_date, :close_date, :a_number, :case_type, :status, :creator, :days_open, :inactive)
 
 Struct.new("Task", :complete_date, :a_number, :hours)

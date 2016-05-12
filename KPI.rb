@@ -5,10 +5,9 @@ require 'WriteExcel'
 require_relative ('Users')
 
 
-#####################################################################################
-# This function takes CSV files and parses the data (line by line) into their 
-# appropriate class.  It utilizes the global variable $users to hold all data
-#####################################################################################
+###############################################################################################
+# This function takes CSV files and parses the data (line by line) into their appropriate class
+###############################################################################################
 def read_data(users_csv_path, cases_csv_path, tasks_csv_path, correspondence_csv_path, start_date, end_date)
 
 	users = []
@@ -21,7 +20,8 @@ def read_data(users_csv_path, cases_csv_path, tasks_csv_path, correspondence_csv
 
 	correspondence_csv = []
 	CSV.foreach(correspondence_csv_path, {encoding: "UTF-8", headers: true, header_converters: :symbol, converters: :all}) do |row|
-  		correspondence_csv << row if Date.strptime(row[3], "%m/%d/%Y %H:%M") >= start_date 
+		correspondence_date = Date.strptime(row[3], "%m/%d/%Y %H:%M") if !row[3].nil?
+  		correspondence_csv << row if ((correspondence_date >= start_date) && (correspondence_date <= end_date))
 	end
 
 	#user list processing
@@ -45,7 +45,6 @@ def read_data(users_csv_path, cases_csv_path, tasks_csv_path, correspondence_csv
 		close_date = line[:closedate]
 		a_number = line[:owner]
 		case_type = line[:casetype]
-		creator = line[:creator]
 
 		#only read in Support cases
 		next if case_type != 'Support'
@@ -55,16 +54,17 @@ def read_data(users_csv_path, cases_csv_path, tasks_csv_path, correspondence_csv
 		close_date = nil if close_date.nil? || close_date.empty?
 		close_date = Date.strptime(close_date, "%m/%d/%Y %H:%M:%S") unless close_date.nil?
 
+		#simple check on days open before adding data to Case
 		if !create_date.nil? && !close_date.nil? && status == -1 && close_date < end_date
 			days_open = (close_date - create_date).to_i
 		elsif create_date <= end_date
 			days_open = (end_date - create_date).to_i
 		end
 
+		temp_case = Case.new(case_number, create_date, close_date, a_number, case_type, status, days_open)
+
 		users.select do |user|
-			user.add_cases(Struct::Case.new(case_number, create_date, close_date, a_number, case_type, status, creator, days_open)) if user.a_number == a_number
-			#add 1 to created cases if creator exists in ticket
-			user.created_cases += 1 if ((a_number == user.a_number) && (!create_date.nil? && create_date >= start_date && create_date <= end_date))
+			user.add_cases(temp_case) if user.a_number == a_number
 		end
 	end
 
@@ -93,56 +93,20 @@ def read_data(users_csv_path, cases_csv_path, tasks_csv_path, correspondence_csv
 
 	#correspondence list processing
 	puts "Processing Correspondence..."
-	inactive_days_count = 7
-	previous_case_number = nil
-	previous_entry_date = start_date
 
 	correspondence_csv.each do |line|
 		case_number = line[:caseno]
 		entry_date = line[:entrydate]
+		comment = line[:comment].to_s
 		entry_date = Date.strptime(entry_date, "%m/%d/%Y %H:%M") unless entry_date.nil?
 
-		#changes date check to start date if case changes
-		if previous_case_number != case_number
-
-			#checks if last correspondence has gap between itself and last day of the period
-			if end_date > previous_entry_date + inactive_days_count
-				users.select do |user|
-					user.cases.select do |ticket|
-						if previous_case_number == ticket.case_number
-							#before marking inactive, checks to make sure ticket isn't a closed ticket
-							if ticket.close_date.nil? && ticket.status != -1
-								ticket.inactive = true
-							end
-						end
-					end
-				end
-			end
-
-			previous_entry_date = start_date
-		end
-
-		#confirms if inactivity is in given date range
-		if ((entry_date >= start_date) && (entry_date <= end_date))
-			#checks if case number is the same as the previous case number
-			if ((case_number == previous_case_number) && !previous_case_number.nil?)
-				#checks if the dates are greater than x days apart
-				if ((entry_date > previous_entry_date + inactive_days_count) && !previous_entry_date.nil?)
-					#finds ticket to mark inactive 
-					users.select do |user|
-						user.cases.select do |ticket|
-							if (case_number == ticket.case_number)
-								ticket.inactive = true 
-								#puts "#{ticket.a_number} - #{ticket.case_number}"
-							end
-						end
-					end
-				end
+		#only save correspondence to the case if it is in the user specified time period
+		users.select do |user|
+			user.cases.select do |ticket|
+				ticket.add_correspondence(Struct::Correspondence.new(entry_date, comment)) if case_number == ticket.case_number
 			end
 		end
 
-		previous_case_number = case_number
-		previous_entry_date = entry_date
 	end
 
 	return users
@@ -384,7 +348,10 @@ def run_forrest_run
 	users_csv = 'C:\Users\A5NB3ZZ\Documents\Projects\2016\5 - May\KPI\userList.txt'
 	cases_csv = 'C:\Users\A5NB3ZZ\Documents\Projects\2016\5 - May\KPI\Cases.txt'
 	tasks_csv = 'C:\Users\A5NB3ZZ\Documents\Projects\2016\5 - May\KPI\Tasks.txt'
-	correspondence_csv = 'C:\Users\A5NB3ZZ\Documents\Projects\2016\5 - May\KPI\Correspondence.txt'
+	correspondence_csv = 'C:\Users\A5NB3ZZ\Documents\Projects\2016\5 - May\KPI\Correspondence2.txt'
+
+	#number of days apart to check for case inactivity
+	days_inactive = 7
 
 	#read in data from CSV into array users of User class
 	users = read_data(users_csv, cases_csv, tasks_csv, correspondence_csv, start_date, end_date)
@@ -393,17 +360,12 @@ def run_forrest_run
 	users.sort! {|x, y| x.team <=> y.team}
 
 	#generate stats for each user via the user class
-	users.each {|x| x.generate_statistics(start_date, end_date)}
+	users.each {|x| x.generate_user_statistics(start_date, end_date, days_inactive)}
 
 	#change this for the output filename/path
 	workbook = WriteExcel.new('C:\Users\A5NB3ZZ\Documents\Projects\2016\5 - May\KPI\test.xls')
 	tf1, tf2, cf1, cf2, mcf1, mcf2 = generate_styles(workbook)
 
-	#users.each do |user|
-	#	user.cases.each do |ticket|
-	#		puts "#{ticket.case_number} - #{ticket.days_open}"
-	#	end
-	#end
 
 	###################
 	#Worksheet Creation
