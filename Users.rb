@@ -44,7 +44,6 @@ class User
 
 				@created_cases += 1 if ticket.created_status == true
 				@inactive_cases += 1 if ticket.inactive_status == true
-				puts "#{@a_number} - #{ticket.case_number} - #{ticket.create_date} - #{ticket.close_date}" if ticket.inactive_status == true && @a_number == "USAC\\A6689ZZ"
 				@open_more_than_10 += 1 if ticket.openmorethan10_status == true
 		end
 

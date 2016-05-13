@@ -341,8 +341,8 @@ end
 def run_forrest_run
 
 	#Change these dates
-	start_date = Date.new(2016,03,01)
-	end_date = Date.new(2016,03,31)
+	start_date = Date.new(2016,04,01)
+	end_date = Date.new(2016,04,30)
 
 	#set csv paths
 	users_csv = 'C:\Users\A5NB3ZZ\Documents\Projects\2016\5 - May\KPI\userList.txt'
@@ -363,7 +363,7 @@ def run_forrest_run
 	users.each {|x| x.generate_user_statistics(start_date, end_date, days_inactive)}
 
 	#change this for the output filename/path
-	workbook = WriteExcel.new('C:\Users\A5NB3ZZ\Documents\Projects\2016\5 - May\KPI\test.xls')
+	workbook = WriteExcel.new('C:\Users\A5NB3ZZ\Documents\Projects\2016\5 - May\KPI\testApril.xls')
 	tf1, tf2, cf1, cf2, mcf1, mcf2 = generate_styles(workbook)
 
 
